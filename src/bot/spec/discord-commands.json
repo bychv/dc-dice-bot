@@ -1,0 +1,1148 @@
+[
+  {
+    "name": "help",
+    "description": "Show help or look up a help entry",
+    "description_localizations": {
+      "zh-CN": "查看帮助文档或指定词条"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "query",
+        "description": "Help entry name; omit for the overview",
+        "name_localizations": {
+          "zh-CN": "词条"
+        },
+        "description_localizations": {
+          "zh-CN": "词条名，省略则显示帮助总览"
+        },
+        "required": false,
+        "autocomplete": true
+      }
+    ]
+  },
+  {
+    "name": "rules",
+    "description": "Look up TRPG rule entries",
+    "description_localizations": {
+      "zh-CN": "规则速查（COC7 词条）"
+    },
+    "options": [
+      {
+        "type": 1,
+        "name": "query",
+        "description": "Look up a rule entry",
+        "name_localizations": {
+          "zh-CN": "查询"
+        },
+        "description_localizations": {
+          "zh-CN": "查询规则词条"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "query",
+            "description": "Rule entry to look up",
+            "name_localizations": {
+              "zh-CN": "词条"
+            },
+            "description_localizations": {
+              "zh-CN": "待查词条，例如 跳跃、大失败"
+            },
+            "required": true
+          },
+          {
+            "type": 3,
+            "name": "rule",
+            "description": "Rule set to search in",
+            "name_localizations": {
+              "zh-CN": "规则"
+            },
+            "description_localizations": {
+              "zh-CN": "指定规则集；省略按默认规则"
+            },
+            "required": false,
+            "choices": [
+              {
+                "name": "COC",
+                "value": "coc"
+              },
+              {
+                "name": "COC7",
+                "value": "coc7"
+              },
+              {
+                "name": "DND",
+                "value": "dnd"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "set",
+        "description": "Set the default rule set",
+        "name_localizations": {
+          "zh-CN": "设置"
+        },
+        "description_localizations": {
+          "zh-CN": "设置默认规则；留空则清空"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "rule",
+            "description": "Default rule set; omit to clear",
+            "name_localizations": {
+              "zh-CN": "规则"
+            },
+            "description_localizations": {
+              "zh-CN": "默认规则；留空表示清空"
+            },
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "r",
+    "description": "Roll dice by parsing the original .r text",
+    "description_localizations": {
+      "zh-CN": "普通掷骰（整行原文解析）"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .r argument line, e.g. 1d4+2 中型刀伤害 or 3#1d6",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "整行 .r 原文，例如 1d4+2 中型刀伤害 / 3#1d6 / 3d6k2 / b2 / 沙漠之鹰；留空则掷默认骰"
+        },
+        "required": false,
+        "autocomplete": true
+      }
+    ]
+  },
+  {
+    "name": "rh",
+    "description": "Hidden roll delivered to a private thread",
+    "description_localizations": {
+      "zh-CN": "暗骰（整行原文解析，投递到本局私密子区）"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .r-family argument line, e.g. 心理学 or 3#1d10 聆听",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "与 /r 相同的整行原文，例如 心理学 / 3#1d10 聆听；留空则掷默认骰"
+        },
+        "required": false,
+        "autocomplete": true
+      },
+      {
+        "type": 6,
+        "name": "keeper",
+        "description": "Keeper (or anyone) who should also see this hidden roll; without a game only",
+        "name_localizations": {
+          "zh-CN": "知情者"
+        },
+        "description_localizations": {
+          "zh-CN": "无局时的知情者，加入该私密子区成员；有局时本局 KP 由 /game start keeper 指定"
+        },
+        "required": false
+      },
+      {
+        "type": 7,
+        "name": "thread",
+        "description": "Target thread; providing it also registers it as this channel default",
+        "name_localizations": {
+          "zh-CN": "子区"
+        },
+        "description_localizations": {
+          "zh-CN": "投递目标子区；给出即登记为本场景默认（子区不能内嵌子区，故暗骰区建在父频道下）"
+        },
+        "required": false,
+        "channel_types": [
+          12,
+          11,
+          10
+        ]
+      },
+      {
+        "type": 5,
+        "name": "reset",
+        "description": "Clear the registered hidden-roll thread for this channel (no roll)",
+        "name_localizations": {
+          "zh-CN": "重置登记"
+        },
+        "description_localizations": {
+          "zh-CN": "取消本频道的子区登记（不掷骰），回到自动创建的私密子区"
+        },
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "rs",
+    "description": "Roll and show the total only, parsing the original .rs text",
+    "description_localizations": {
+      "zh-CN": "省略单骰点数直接给结果（整行原文解析）"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .rs argument line, e.g. 沙鹰伤害",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "整行 .rs 原文，例如 沙鹰伤害 / 1D10+1D6+3 沙鹰伤害"
+        },
+        "required": true,
+        "autocomplete": true
+      }
+    ]
+  },
+  {
+    "name": "game",
+    "description": "Manage concurrent sessions; KP, thread, sheets, rules and log follow the active one",
+    "description_localizations": {
+      "zh-CN": "对局管理：默认在子区开团，多局并存，KP/暗骰子区/角色卡/房规/日志随局切换"
+    },
+    "options": [
+      {
+        "type": 1,
+        "name": "start",
+        "description": "Register a session: create its scene thread, hidden-roll thread and log",
+        "name_localizations": {
+          "zh-CN": "开始"
+        },
+        "description_localizations": {
+          "zh-CN": "新建一局：默认在子区开，建暗骰子区与日志，并切到本局"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Table name; defaults to channel name plus timestamp",
+            "name_localizations": {
+              "zh-CN": "桌名"
+            },
+            "description_localizations": {
+              "zh-CN": "桌名；省略时用 <频道名> · <MMDD-HHmm>"
+            },
+            "required": false
+          },
+          {
+            "type": 6,
+            "name": "keeper",
+            "description": "Keeper of this session; defaults to the caller",
+            "name_localizations": {
+              "zh-CN": "kp"
+            },
+            "description_localizations": {
+              "zh-CN": "本局 KP；省略时发起者即 KP"
+            },
+            "required": false
+          },
+          {
+            "type": 7,
+            "name": "thread",
+            "description": "Existing thread to use as this session main scene; omit to create one",
+            "name_localizations": {
+              "zh-CN": "主场景子区"
+            },
+            "description_localizations": {
+              "zh-CN": "指定已有子区作为本局主场景；省略时自动在当前频道下新建"
+            },
+            "required": false,
+            "channel_types": [
+              11,
+              12,
+              10
+            ]
+          },
+          {
+            "type": 5,
+            "name": "here",
+            "description": "Use the current channel/thread in place instead of creating a sub-thread",
+            "name_localizations": {
+              "zh-CN": "就地"
+            },
+            "description_localizations": {
+              "zh-CN": "为真则就地使用当前频道或子区，不新建子区"
+            },
+            "required": false
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "list",
+        "description": "List all sessions in this server",
+        "name_localizations": {
+          "zh-CN": "列表"
+        },
+        "description_localizations": {
+          "zh-CN": "列出本服所有局：编号、桌名、KP、状态、主场景、暗骰子区"
+        }
+      },
+      {
+        "type": 1,
+        "name": "switch",
+        "description": "Switch the current channel/thread to another session (admin or that session Keeper)",
+        "name_localizations": {
+          "zh-CN": "切换"
+        },
+        "description_localizations": {
+          "zh-CN": "把当前场景（频道或子区）切到指定局；角色卡、暗骰子区、房规、日志随之切换（管理员或该局 KP）"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "game",
+            "description": "Session name or list index, e.g. #1 or 阿卡姆",
+            "name_localizations": {
+              "zh-CN": "局"
+            },
+            "description_localizations": {
+              "zh-CN": "桌名或列表编号，例如 #1、阿卡姆"
+            },
+            "required": true,
+            "autocomplete": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "state",
+        "description": "Show the session bound to the current channel/thread and its context",
+        "name_localizations": {
+          "zh-CN": "状态"
+        },
+        "description_localizations": {
+          "zh-CN": "查看当前场景（频道或子区）的局及其上下文（KP、主场景、暗骰子区、房规、日志）"
+        }
+      },
+      {
+        "type": 1,
+        "name": "end",
+        "description": "End a session: export its open logs and unbind its scenes (threads untouched by default)",
+        "name_localizations": {
+          "zh-CN": "结束"
+        },
+        "description_localizations": {
+          "zh-CN": "结束指定局：导出本局所有未结束的日志并解绑其场景；默认不动子区（该局 KP 或管理员）"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "game",
+            "description": "Session name or list index; omit for the session of the current channel/thread",
+            "name_localizations": {
+              "zh-CN": "局"
+            },
+            "description_localizations": {
+              "zh-CN": "桌名或列表编号；省略则为当前场景的局"
+            },
+            "required": false,
+            "autocomplete": true
+          },
+          {
+            "type": 5,
+            "name": "archive",
+            "description": "Also archive this session threads; default false leaves them untouched",
+            "name_localizations": {
+              "zh-CN": "归档子区"
+            },
+            "description_localizations": {
+              "zh-CN": "为真时才归档本局自建子区；默认 false，Bot 不碰任何子区"
+            },
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "pc",
+    "description": "Manage character sheets",
+    "description_localizations": {
+      "zh-CN": "多角色卡管理"
+    },
+    "options": [
+      {
+        "type": 1,
+        "name": "new",
+        "description": "Create a blank character sheet",
+        "name_localizations": {
+          "zh-CN": "新建"
+        },
+        "description_localizations": {
+          "zh-CN": "新建空白卡；省略参数则生成 COC7 模板随机姓名卡"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Sheet name",
+            "name_localizations": {
+              "zh-CN": "卡名"
+            },
+            "description_localizations": {
+              "zh-CN": "角色卡名称"
+            },
+            "required": false
+          },
+          {
+            "type": 3,
+            "name": "template",
+            "description": "Template name, e.g. COC7",
+            "name_localizations": {
+              "zh-CN": "模板"
+            },
+            "description_localizations": {
+              "zh-CN": "模板名，例如 COC7"
+            },
+            "required": false
+          },
+          {
+            "type": 3,
+            "name": "text",
+            "description": "Raw parameters, passthrough of the legacy syntax",
+            "name_localizations": {
+              "zh-CN": "原样参数"
+            },
+            "description_localizations": {
+              "zh-CN": "兜底：原样透传老写法参数"
+            },
+            "required": false
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "tag",
+        "description": "Bind a sheet to the current session (or channel when none); omit to unbind",
+        "name_localizations": {
+          "zh-CN": "绑定"
+        },
+        "description_localizations": {
+          "zh-CN": "为当前局绑定指定卡（无局时为频道）；留空解绑并回落到下一级"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Sheet name",
+            "name_localizations": {
+              "zh-CN": "卡名"
+            },
+            "description_localizations": {
+              "zh-CN": "角色卡名称"
+            },
+            "required": false
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "show",
+        "description": "Show all attributes of a sheet",
+        "name_localizations": {
+          "zh-CN": "展示"
+        },
+        "description_localizations": {
+          "zh-CN": "展示指定卡的所有属性；留空展示当前卡"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Sheet name; omit for the current sheet",
+            "name_localizations": {
+              "zh-CN": "卡名"
+            },
+            "description_localizations": {
+              "zh-CN": "角色卡名称；留空为当前卡"
+            },
+            "required": false,
+            "autocomplete": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "rename",
+        "description": "Rename the current sheet",
+        "name_localizations": {
+          "zh-CN": "重命名"
+        },
+        "description_localizations": {
+          "zh-CN": "重命名当前卡，不允许重名"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "New sheet name",
+            "name_localizations": {
+              "zh-CN": "新卡名"
+            },
+            "description_localizations": {
+              "zh-CN": "新的角色卡名称"
+            },
+            "required": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "copy",
+        "description": "Copy attributes from one sheet to another",
+        "name_localizations": {
+          "zh-CN": "复制"
+        },
+        "description_localizations": {
+          "zh-CN": "把源卡属性复制给目标卡，目标卡不存在则新建"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "from",
+            "description": "Source sheet",
+            "name_localizations": {
+              "zh-CN": "源卡"
+            },
+            "description_localizations": {
+              "zh-CN": "源角色卡"
+            },
+            "required": true
+          },
+          {
+            "type": 3,
+            "name": "to",
+            "description": "Destination sheet",
+            "name_localizations": {
+              "zh-CN": "目标卡"
+            },
+            "description_localizations": {
+              "zh-CN": "目标角色卡"
+            },
+            "required": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "del",
+        "description": "Delete a sheet",
+        "name_localizations": {
+          "zh-CN": "删除"
+        },
+        "description_localizations": {
+          "zh-CN": "删除指定角色卡"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Sheet name",
+            "name_localizations": {
+              "zh-CN": "卡名"
+            },
+            "description_localizations": {
+              "zh-CN": "角色卡名称"
+            },
+            "required": true,
+            "autocomplete": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "list",
+        "description": "List all character sheets",
+        "name_localizations": {
+          "zh-CN": "列表"
+        },
+        "description_localizations": {
+          "zh-CN": "列出全部角色卡"
+        }
+      },
+      {
+        "type": 1,
+        "name": "grp",
+        "description": "List sheet bindings: per session and per channel",
+        "name_localizations": {
+          "zh-CN": "绑定列表"
+        },
+        "description_localizations": {
+          "zh-CN": "列出绑定关系：各局绑定 + 各频道绑定"
+        }
+      },
+      {
+        "type": 1,
+        "name": "build",
+        "description": "Fill attributes from a template",
+        "name_localizations": {
+          "zh-CN": "填充"
+        },
+        "description_localizations": {
+          "zh-CN": "按模板填充生成属性（COC7 为 9 项主属性）"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Sheet name",
+            "name_localizations": {
+              "zh-CN": "卡名"
+            },
+            "description_localizations": {
+              "zh-CN": "角色卡名称"
+            },
+            "required": true
+          },
+          {
+            "type": 3,
+            "name": "text",
+            "description": "Generation parameters, legacy passthrough",
+            "name_localizations": {
+              "zh-CN": "生成参数"
+            },
+            "description_localizations": {
+              "zh-CN": "生成参数"
+            },
+            "required": false
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "redo",
+        "description": "Clear and regenerate attributes",
+        "name_localizations": {
+          "zh-CN": "重作"
+        },
+        "description_localizations": {
+          "zh-CN": "清空原有属性后重新生成"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Sheet name",
+            "name_localizations": {
+              "zh-CN": "卡名"
+            },
+            "description_localizations": {
+              "zh-CN": "角色卡名称"
+            },
+            "required": true
+          },
+          {
+            "type": 3,
+            "name": "text",
+            "description": "Generation parameters, legacy passthrough",
+            "name_localizations": {
+              "zh-CN": "生成参数"
+            },
+            "description_localizations": {
+              "zh-CN": "生成参数"
+            },
+            "required": false
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "clr",
+        "description": "Destroy all character sheets (requires confirmation)",
+        "name_localizations": {
+          "zh-CN": "清空"
+        },
+        "description_localizations": {
+          "zh-CN": "销毁全部角色卡记录（危险操作，需二次确认）"
+        }
+      },
+      {
+        "type": 1,
+        "name": "stat",
+        "description": "Show roll statistics of the current sheet",
+        "name_localizations": {
+          "zh-CN": "统计"
+        },
+        "description_localizations": {
+          "zh-CN": "查看角色掷骰统计"
+        }
+      }
+    ]
+  },
+  {
+    "name": "st",
+    "description": "Record character attributes by parsing the original .st text",
+    "description_localizations": {
+      "zh-CN": "属性录入与修改（整行原文解析）"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .st argument line, e.g. 力量:50 体质:55 or hp-1",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "整行 .st 原文，例如 力量:50 体质:55 / hp-1 / &沙漠之鹰=1D10+1D6+3 / show 灵感 / del kp裁决 / clr"
+        },
+        "required": true,
+        "autocomplete": true
+      }
+    ]
+  },
+  {
+    "name": "rc",
+    "description": "Skill check by parsing the original .rc/.ra text",
+    "description_localizations": {
+      "zh-CN": "属性/技能检定（整行原文解析）"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .rc/.ra argument line, e.g. 困难智力 99 or 3#p 手枪",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "整行原文，例如 力量 / 困难智力 99 / 3#p 手枪 / 体质*5 / 敏捷-10"
+        },
+        "required": true,
+        "autocomplete": true
+      }
+    ]
+  },
+  {
+    "name": "ra",
+    "description": "Skill check by parsing the original .rc/.ra text",
+    "description_localizations": {
+      "zh-CN": "属性/技能检定（rc 同义命令，整行原文解析）"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .rc/.ra argument line, e.g. 困难智力 99 or 3#p 手枪",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "整行原文，例如 力量 / 困难智力 99 / 3#p 手枪 / 体质*5 / 敏捷-10"
+        },
+        "required": true,
+        "autocomplete": true
+      }
+    ]
+  },
+  {
+    "name": "setcoc",
+    "description": "Configure CoC house rules for the current session or channel",
+    "description_localizations": {
+      "zh-CN": "设置与查看本局（无局时为频道）的 COC 检定房规"
+    },
+    "options": [
+      {
+        "type": 1,
+        "name": "set",
+        "description": "Set the house rule for this channel (0-6)",
+        "name_localizations": {
+          "zh-CN": "设置"
+        },
+        "description_localizations": {
+          "zh-CN": "为当前频道设置房规 0-6"
+        },
+        "options": [
+          {
+            "type": 4,
+            "name": "rule",
+            "description": "House rule number",
+            "name_localizations": {
+              "zh-CN": "房规"
+            },
+            "description_localizations": {
+              "zh-CN": "房规编号"
+            },
+            "required": true,
+            "choices": [
+              {
+                "name": "0 - 规则书",
+                "value": 0
+              },
+              {
+                "name": "1",
+                "value": 1
+              },
+              {
+                "name": "2",
+                "value": 2
+              },
+              {
+                "name": "3",
+                "value": 3
+              },
+              {
+                "name": "4",
+                "value": 4
+              },
+              {
+                "name": "5",
+                "value": 5
+              },
+              {
+                "name": "6 - 个位=十位",
+                "value": 6
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "show",
+        "description": "Show the current house rule",
+        "name_localizations": {
+          "zh-CN": "查看"
+        },
+        "description_localizations": {
+          "zh-CN": "查看当前房规"
+        }
+      },
+      {
+        "type": 1,
+        "name": "clr",
+        "description": "Clear the channel house rule",
+        "name_localizations": {
+          "zh-CN": "清除"
+        },
+        "description_localizations": {
+          "zh-CN": "清除房规，回落到骰主默认规则"
+        }
+      }
+    ]
+  },
+  {
+    "name": "sc",
+    "description": "Sanity check by parsing the original .sc text",
+    "description_localizations": {
+      "zh-CN": "理智检定（整行原文解析）"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .sc argument line, e.g. 0/1 70 or 1d10/1d100 直面外神",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "整行 .sc 原文，例如 0/1 70 / 1d10/1d100 直面外神；san 已录入时可省略数字"
+        },
+        "required": true,
+        "autocomplete": true
+      }
+    ]
+  },
+  {
+    "name": "ti",
+    "description": "Temporary insanity symptom",
+    "description_localizations": {
+      "zh-CN": "临时疯狂症状"
+    }
+  },
+  {
+    "name": "li",
+    "description": "Summary insanity symptom",
+    "description_localizations": {
+      "zh-CN": "总结疯狂症状"
+    }
+  },
+  {
+    "name": "en",
+    "description": "Skill improvement check by parsing the original .en text",
+    "description_localizations": {
+      "zh-CN": "成长检定（整行原文解析）"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .en argument line, e.g. 教育 60 教育增强",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "整行 .en 原文，例如 教育 60 教育增强 / 幸运 +1D3/1D10 幸运成长 / 侦查"
+        },
+        "required": true,
+        "autocomplete": true
+      }
+    ]
+  },
+  {
+    "name": "log",
+    "description": "Record and export logs per channel/thread; /log new starts a session when the scene has none",
+    "description_localizations": {
+      "zh-CN": "日志记录（记录当前频道/子区；按场景隔离、不随局切换；无局时自动建局；暂停中的日志不自动结束）"
+    },
+    "options": [
+      {
+        "type": 1,
+        "name": "new",
+        "description": "Start a log; rejected while another log is still recording",
+        "name_localizations": {
+          "zh-CN": "新建"
+        },
+        "description_localizations": {
+          "zh-CN": "另开日志并开始记录；当前日志仍在记录时会被拒绝（暂停中的旧日志会保留）"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Log name; defaults to a timestamp",
+            "name_localizations": {
+              "zh-CN": "日志名"
+            },
+            "description_localizations": {
+              "zh-CN": "日志名；省略则用创建时间戳"
+            },
+            "required": false
+          },
+          {
+            "type": 3,
+            "name": "game",
+            "description": "Attach the log to this session (name or index); omit to auto-detect",
+            "name_localizations": {
+              "zh-CN": "局"
+            },
+            "description_localizations": {
+              "zh-CN": "挂到哪个已有局（桌名或编号）；省略时按当前场景自动判断"
+            },
+            "required": false,
+            "autocomplete": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "list",
+        "description": "List logs of the current session: name, state, start time",
+        "name_localizations": {
+          "zh-CN": "列表"
+        },
+        "description_localizations": {
+          "zh-CN": "列出当前局/场景的日志：名称、状态（记录中/已暂停/已结束）、开始时间"
+        }
+      },
+      {
+        "type": 1,
+        "name": "on",
+        "description": "Resume the active log",
+        "name_localizations": {
+          "zh-CN": "继续"
+        },
+        "description_localizations": {
+          "zh-CN": "继续记录当前生效的日志"
+        }
+      },
+      {
+        "type": 1,
+        "name": "off",
+        "description": "Pause recording; the log is kept and can be resumed or exported later",
+        "name_localizations": {
+          "zh-CN": "暂停"
+        },
+        "description_localizations": {
+          "zh-CN": "暂停记录（日志保留，可继续或用 /log end 导出）"
+        }
+      },
+      {
+        "type": 1,
+        "name": "end",
+        "description": "Finish and export a log; defaults to the active one",
+        "name_localizations": {
+          "zh-CN": "结束"
+        },
+        "description_localizations": {
+          "zh-CN": "结束并导出日志；省略 name 时作用于当前生效的那条"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Log name; omit for the active log",
+            "name_localizations": {
+              "zh-CN": "日志名"
+            },
+            "description_localizations": {
+              "zh-CN": "日志名；省略则结束当前生效的日志"
+            },
+            "required": false,
+            "autocomplete": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "nn",
+    "description": "Set the display name used in rolls",
+    "description_localizations": {
+      "zh-CN": "设置掷骰称呼"
+    },
+    "options": [
+      {
+        "type": 1,
+        "name": "set",
+        "description": "Set the display name",
+        "name_localizations": {
+          "zh-CN": "设置"
+        },
+        "description_localizations": {
+          "zh-CN": "设置当前频道的称呼"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Display name, e.g. kp",
+            "name_localizations": {
+              "zh-CN": "称呼"
+            },
+            "description_localizations": {
+              "zh-CN": "称呼，例如 kp"
+            },
+            "required": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "del",
+        "description": "Delete the display name of this channel",
+        "name_localizations": {
+          "zh-CN": "删除"
+        },
+        "description_localizations": {
+          "zh-CN": "删除当前频道称呼"
+        }
+      },
+      {
+        "type": 1,
+        "name": "clr",
+        "description": "Delete all recorded display names",
+        "name_localizations": {
+          "zh-CN": "清空"
+        },
+        "description_localizations": {
+          "zh-CN": "删除在各频道记录的所有称呼"
+        }
+      }
+    ]
+  },
+  {
+    "name": "nnn",
+    "description": "Random display name from a name deck",
+    "description_localizations": {
+      "zh-CN": "随机称呼"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "lang",
+        "description": "Name deck language",
+        "name_localizations": {
+          "zh-CN": "语言"
+        },
+        "description_localizations": {
+          "zh-CN": "从指定子牌堆随机，可选 cn/jp/en"
+        },
+        "required": false,
+        "choices": [
+          {
+            "name": "中文",
+            "value": "cn"
+          },
+          {
+            "name": "日文",
+            "value": "jp"
+          },
+          {
+            "name": "英文",
+            "value": "en"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "name",
+    "description": "Generate random names",
+    "description_localizations": {
+      "zh-CN": "随机昵称/姓名"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "lang",
+        "description": "Name language",
+        "name_localizations": {
+          "zh-CN": "语言"
+        },
+        "description_localizations": {
+          "zh-CN": "限定中文/日文/英文名"
+        },
+        "required": false,
+        "choices": [
+          {
+            "name": "中文",
+            "value": "cn"
+          },
+          {
+            "name": "日文",
+            "value": "jp"
+          },
+          {
+            "name": "英文",
+            "value": "en"
+          }
+        ]
+      },
+      {
+        "type": 4,
+        "name": "count",
+        "description": "How many names to generate (1-10)",
+        "name_localizations": {
+          "zh-CN": "数量"
+        },
+        "description_localizations": {
+          "zh-CN": "生成数量 1-10"
+        },
+        "required": false,
+        "min_value": 1,
+        "max_value": 10
+      }
+    ]
+  }
+]

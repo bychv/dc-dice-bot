@@ -1,0 +1,35 @@
+# 依赖与构建产物
+node_modules/
+dist/
+coverage/
+
+# 日志与临时文件
+*.log
+.tmp/
+
+# 隐私：环境变量与密钥 —— 绝不入库，只保留在服务器 / 本机
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+.npmrc
+
+# 运行时数据（角色卡 / 局 / 日志导出）
+data/
+
+# 部署产物
+bot-deploy.tar.gz
+*.tar.gz
+*.tgz
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

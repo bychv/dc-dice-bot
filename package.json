@@ -1,0 +1,30 @@
+{
+  "name": "dcdice-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Discord CoC dice bot - TypeScript implementation of docs/Discord_CoC_Command_Set.md",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/run-tests.ts",
+    "spec:check": "node scripts/check-manifest.ts",
+    "check": "npm run typecheck && npm run spec:check && npm test",
+    "deploy": "node --env-file-if-exists=.env src/bot/deploy.ts",
+    "sync": "node --env-file-if-exists=.env scripts/sync-commands.ts",
+    "start": "node --env-file-if-exists=.env src/bot/main.ts",
+    "info": "node --env-file-if-exists=.env scripts/discord-info.ts",
+    "perms": "node --env-file-if-exists=.env scripts/discord-perms.ts"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0",
+    "https-proxy-agent": "^9.1.0",
+    "undici": "^8.10.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}
