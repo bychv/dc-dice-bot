@@ -171,15 +171,25 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
     if (this.timer) return;
     this.timer = setTimeout(() => {
       this.timer = null;
-      this.writeDirty();
+      // 定时器里**绝不抛**：抛出去就是 uncaughtException，会把整只 bot 打崩
+      this.writeDirty(false);
     }, 250);
     this.timer.unref?.();
   }
 
-  private writeDirty(): void {
+  /**
+   * 写盘。`strict=false`（debounce 定时器路径）时失败只报告、保留 dirty 等下次再写；
+   * `strict=true`（显式 `flush()`）时照旧抛出，调用方要能知道"没写成功"。
+   */
+  private writeDirty(strict: boolean): void {
     for (const key of [...this.dirty]) {
-      this.writeCollection(key);
-      this.dirty.delete(key);
+      try {
+        this.writeCollection(key);
+        this.dirty.delete(key);
+      } catch (error) {
+        if (strict) throw error;
+        console.error(`写入 ${key}.json 失败（保留待写，下次 flush 再试）：`, error);
+      }
     }
   }
 
@@ -188,7 +198,7 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
       clearTimeout(this.timer);
       this.timer = null;
     }
-    this.writeDirty();
+    this.writeDirty(true);
   }
 
   // ---- character sheets --------------------------------------------------

@@ -134,19 +134,29 @@ async function gameEnd(ctx: InteractionContext, deps: HandlerDeps): Promise<Repl
 
   const archive = optionBoolean(ctx, 'archive') ?? false;
 
-  // 自动收尾：本局所有未结束的日志（含暂停中的）逐条结束并导出
+  // 自动收尾：本局所有未结束的日志（含暂停中的）逐条结束并导出。
+  // 配了对象存储（R2）就上传发链接；未配或上传失败时把文件作为附件发出去。
   const logs = deps.store
     .listLogs({ gameId: target.id, channelId: '', guildId: ctx.guildId ?? undefined })
     .filter((log) => log.state !== 'ended');
   const files: OutgoingFile[] = [];
   const exported: string[] = [];
   const emptyLogs: string[] = [];
+  const uploadFailures: string[] = [];
   for (const log of logs) {
     const { log: ended, file } = exportLogRecord(deps, log, deps.now());
     if (file.data.length === 0) {
       // 0 字节附件会被 Discord 拒绝：只报告，不附带
       emptyLogs.push(`「${ended.name}」（无内容）`);
       continue;
+    }
+    if (deps.logUpload) {
+      const uploaded = await deps.logUpload.upload(file);
+      if (uploaded.ok) {
+        exported.push(`「${ended.name}」→ ${uploaded.url}${uploaded.presigned ? '（链接有有效期）' : ''}`);
+        continue;
+      }
+      uploadFailures.push(`「${ended.name}」：${uploaded.error}`);
     }
     files.push(file);
     exported.push(`「${ended.name}」→ ${ended.fileName}`);
@@ -181,6 +191,9 @@ async function gameEnd(ctx: InteractionContext, deps: HandlerDeps): Promise<Repl
   const lines = [
     `已结束 ${target.id} ${target.name}（KP:${mentionUser(target.keeperId)}）。`,
     exported.length > 0 ? `导出日志：\n${exported.map((e) => `· ${e}`).join('\n')}` : '本局没有未结束的日志。',
+    uploadFailures.length > 0
+      ? `⚠️ 以下日志上传对象存储失败，已改用附件：${uploadFailures.join('；')}`
+      : '',
     archive
       ? archived.length > 0
         ? `已归档本局自建子区：${archived.join('、')}（可在客户端手动取消归档）`

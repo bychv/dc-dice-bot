@@ -171,12 +171,20 @@ async function logEnd(ctx: InteractionContext, deps: HandlerDeps): Promise<Reply
     // 0 字节附件会被 Discord 拒绝，这里直接说明（Dice! 的 strLogEndEmpty 语义）
     return ok(`已结束日志「${ended.name}」√\n本次无日志产生（没有记录到任何消息）。`);
   }
-  return ok(
-    `已结束日志「${ended.name}」并导出为 \`${ended.fileName}\`（开始于 ${fmtDateTime(
-      ended.startedAt,
-    )}）。`,
-    [file],
-  );
+
+  // 配了对象存储（Cloudflare R2）就上传并发链接：Discord 附件上传会超时/被拒，链接也更耐存
+  const header =
+    `已结束日志「${ended.name}」并导出为 \`${ended.fileName}\`` +
+    `（开始于 ${fmtDateTime(ended.startedAt)}）。`;
+  if (deps.logUpload) {
+    const uploaded = await deps.logUpload.upload(file);
+    if (uploaded.ok) {
+      const expiry = uploaded.presigned ? '（链接有有效期，过期后请重新导出）' : '';
+      return ok(`${header}\n📎 下载：${uploaded.url}${expiry}`);
+    }
+    return ok(`${header}\n⚠️ 上传到对象存储失败，改用附件：${uploaded.error}`, [file]);
+  }
+  return ok(header, [file]);
 }
 
 export const logHandler: CommandHandler = async (ctx, deps) => {

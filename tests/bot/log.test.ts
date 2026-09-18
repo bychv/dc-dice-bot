@@ -216,6 +216,73 @@ describe('/log on / off / end', () => {
     assert.ok(reply.content.includes('找不到'));
   });
 
+  test('/log end 配了对象存储时：上传并只回链接（不带附件）', async () => {
+    const uploaded: { name: string; size: number }[] = [];
+    const env = makeEnv({
+      logUpload: {
+        async upload(file) {
+          uploaded.push({ name: file.name, size: file.data.length });
+          return { ok: true, key: `logs/2026/01/${file.name}`, url: `https://r2.example.com/logs/2026/01/${file.name}`, presigned: false };
+        },
+      },
+    });
+    await route(startCtx(env, { name: '阿卡姆', keeper: 'KP1' }), env.deps);
+    const scene = env.store.getGame('G1', '#1')!.sceneThreadId!;
+    env.store.appendLogLine(scene, '甲(U1) 2026-01-01 00:00:00\n你好\n\n');
+
+    const reply = await route(
+      makeContext({ command: 'log', sub: 'end', channelId: scene, parentChannelId: 'C1', userId: 'KP1' }, env.platform),
+      env.deps,
+    );
+    assert.equal(uploaded.length, 1, '必须上传一次');
+    assert.ok(uploaded[0]!.size > 0);
+    assert.equal(reply.files, undefined, '上传成功后不再带附件（Discord 附件易超时）');
+    assert.match(reply.content, /https:\/\/r2\.example\.com\/logs\/2026\/01\//);
+    assert.ok(reply.content.includes(uploaded[0]!.name), reply.content);
+  });
+
+  test('/log end 上传失败时：回落成附件并说明原因', async () => {
+    const env = makeEnv({
+      logUpload: {
+        async upload() {
+          return { ok: false, error: 'R2 上传失败：HTTP 403 SignatureDoesNotMatch' };
+        },
+      },
+    });
+    await route(startCtx(env, { name: '阿卡姆', keeper: 'KP1' }), env.deps);
+    const scene = env.store.getGame('G1', '#1')!.sceneThreadId!;
+    env.store.appendLogLine(scene, '甲(U1) 2026-01-01 00:00:00\n你好\n\n');
+
+    const reply = await route(
+      makeContext({ command: 'log', sub: 'end', channelId: scene, parentChannelId: 'C1', userId: 'KP1' }, env.platform),
+      env.deps,
+    );
+    assert.equal(reply.files?.length, 1, '上传失败必须回落到附件');
+    assert.ok(reply.content.includes('上传到对象存储失败'), reply.content);
+    assert.ok(reply.content.includes('SignatureDoesNotMatch'), reply.content);
+  });
+
+  test('/log end 空日志依旧不产生附件、也不上传', async () => {
+    const uploads: string[] = [];
+    const env = makeEnv({
+      logUpload: {
+        async upload(file) {
+          uploads.push(file.name);
+          return { ok: true, key: 'k', url: 'https://r2.example.com/k', presigned: false };
+        },
+      },
+    });
+    await route(startCtx(env, { name: '阿卡姆', keeper: 'KP1' }), env.deps);
+    const scene = env.store.getGame('G1', '#1')!.sceneThreadId!;
+    const reply = await route(
+      makeContext({ command: 'log', sub: 'end', channelId: scene, parentChannelId: 'C1', userId: 'KP1' }, env.platform),
+      env.deps,
+    );
+    assert.equal(uploads.length, 0, '空日志不上传');
+    assert.equal(reply.files, undefined);
+    assert.ok(reply.content.includes('本次无日志产生'), reply.content);
+  });
+
   test('/log list with no log at all explains how to start one', async () => {
     const env = makeEnv();
     const reply = await route(makeContext({ command: 'log', sub: 'list', channelId: 'CX' }, env.platform), env.deps);

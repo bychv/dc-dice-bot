@@ -54,6 +54,26 @@ npm start        # 启动
 | `DCDICE_AUDIT_LOG` | 可选；设 `0` 关闭运行日志（默认开，见下） |
 | `DCDICE_DATA_DIR` | 可选；数据目录，默认 `./data` |
 
+## 日志转存到 Cloudflare R2（可选）
+
+日志文件默认作为**Discord 附件**发送；配上 R2 后改为**上传对象存储 + 回执里只发链接**（服务器端上传，不受 Discord 附件大小/超时限制，日志也不会随消息过期）：
+
+| 变量 | 必填 | 说明 |
+| --- | --- | --- |
+| `R2_BUCKET` | ✅ | 桶名 |
+| `R2_ACCESS_KEY_ID` | ✅ | R2 API Token 的 Access Key ID |
+| `R2_SECRET_ACCESS_KEY` | ✅ | 同上 Secret Access Key |
+| `R2_ENDPOINT` 或 `R2_ACCOUNT_ID` | ✅（二选一） | 只给 `R2_ACCOUNT_ID` 会自动拼 `https://<account id>.r2.cloudflarestorage.com` |
+| `R2_PREFIX` | ⬜ | 对象键前缀，默认 `dcdice-logs/`；对象键 = `<prefix><年>/<月>/<文件名>` |
+| `R2_PUBLIC_BASE_URL` | ⬜ | 自定义域/公开域；填了发**直链**，不填发**预签名链接** |
+| `R2_PRESIGN_TTL` | ⬜ | 预签名有效期（秒，60–604800），默认 604800（7 天） |
+| `R2_REGION` | ⬜ | SigV4 scope 的 region，默认 `auto` |
+
+- **开通步骤**：Cloudflare 面板 → **R2** → 建一个桶 → 右上 **Manage R2 API Tokens** → Create API Token（权限选 *Object Read & Write*，可限定到该桶）→ 记下 *Access Key ID* 与 *Secret Access Key*；*Account ID* 在 R2 概览页。
+- **链接形式**：桶不公开时用默认的**预签名链接**（默认 7 天有效，回执里会提示"链接有有效期"）；想长期可点就给桶绑自定义域并填 `R2_PUBLIC_BASE_URL`。
+- **降级行为**：`/log end`、`/game end` 逐个上传；R2 没配或上传失败时**自动回落到 Discord 附件**并在回执里写明原因；空日志不上传。启动日志会打印一次 `日志将上传到 R2：bucket=… prefix=… `。
+- **实现**：SigV4 用 `node:crypto` 手写（**零运行依赖**），并用 AWS 官方实现 `aws4`（仅 devDependency）做**逐字符交叉校验**，见 `tests/bot/log-upload.test.ts`。
+
 ## 运行日志（journald）
 
 每条 slash 命令写两行：**一行上下文 + 一行回执摘要**，用于事后排查"这个场景里为什么读不到卡 / 房规不对 / 子区没继承"：

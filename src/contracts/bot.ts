@@ -109,6 +109,16 @@ export interface Platform {
   canCreateThreads(channelId: string): Promise<boolean>;
 }
 
+/**
+ * 日志文件的外部转存（Cloudflare R2 等对象存储）：`/log end`、`/game end` 导出后优先上传到这里，
+ * 回执里只发链接；未注入或上传失败时回落到 Discord 附件。
+ */
+export interface LogUpload {
+  upload(file: OutgoingFile): Promise<
+    { ok: true; key: string; url: string; presigned: boolean } | { ok: false; error: string }
+  >;
+}
+
 export interface HandlerDeps {
   store: BotStore;
   dice: DiceEngine;
@@ -119,6 +129,8 @@ export interface HandlerDeps {
   confirmations: PendingActions;
   /** 注入时钟（测试冻结它） */
   now(): Date;
+  /** 可选：日志文件转存到对象存储（配置了 R2_* 时由 main.ts 注入） */
+  logUpload?: LogUpload;
 }
 
 export type CommandHandler = (ctx: InteractionContext, deps: HandlerDeps) => Promise<ReplyPayload>;

@@ -24,6 +24,7 @@ import {
 import { createAuditLogger } from './audit.ts';
 import { registerGuildCommands } from './command-sync.ts';
 import { createPendingActions } from './confirm.ts';
+import { createLogUploader, readR2Config } from './log-upload.ts';
 import { COMMANDS } from './manifest.ts';
 import { installProxyFromEnv, redactProxy } from './net-proxy.ts';
 
@@ -87,6 +88,21 @@ const client = new Client({
 
 const store = createJsonStoreWithExtras({ dir: dataDir });
 const dice = createDiceEngine();
+
+/**
+ * 日志转存（可选）：配齐 `R2_*` 后 `/log end`、`/game end` 把日志文件上传到 Cloudflare R2，
+ * 回执里只发链接（Discord 附件上传易超时）；没配就维持原来的附件行为。
+ */
+const r2 = readR2Config();
+if (r2.kind === 'invalid') {
+  console.error(`R2 配置无效，日志仍走 Discord 附件：${r2.error}`);
+} else if (r2.kind === 'ok') {
+  console.log(
+    `日志将上传到 R2：bucket=${r2.config.bucket} prefix=${r2.config.prefix} ` +
+      (r2.config.publicBaseUrl ? `公开域=${r2.config.publicBaseUrl}` : `预签名链接 ${r2.config.presignTtl}s`),
+  );
+}
+
 const deps: HandlerDeps = {
   store,
   dice,
@@ -95,6 +111,7 @@ const deps: HandlerDeps = {
   platform: createDiscordPlatform(client),
   confirmations: createPendingActions(),
   now: () => new Date(),
+  ...(r2.kind === 'ok' ? { logUpload: createLogUploader(r2.config) } : {}),
 };
 
 /**
