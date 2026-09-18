@@ -26,7 +26,7 @@ import type {
 } from '../contracts/bot.ts';
 import type { BotStore } from '../contracts/store.ts';
 import { handleButtonClick } from './confirm.ts';
-import { appendBotReplyLine, appendUserLogLine } from './logFormat.ts';
+import { appendBotReplyLine, appendUserLogLine, isOutOfCharacterText } from './logFormat.ts';
 import { botSpeakerName, speakerName } from './logSpeaker.ts';
 import { route } from './router.ts';
 
@@ -447,6 +447,8 @@ export function createLogRecorder(store: BotStore): (message: Message) => void {
         : '';
       const line = [text, attachments].filter((part) => part.length > 0).join(' ');
       if (line.length === 0) return;
+      // 场外话（以全/半角括号开头）不入日志，与 logPainter 的「过滤 () 发言」同口径
+      if (isOutOfCharacterText(line)) return;
       const input = { name, uid: userId, at: new Date(), text: line };
       const appended = appendUserLogLine(store, channelId, input);
       // 子区消息：子区本身常常不是「绑定场景」（游戏绑的是父频道/主场景），

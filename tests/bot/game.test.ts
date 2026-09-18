@@ -55,7 +55,7 @@ describe('/game start', () => {
     const logs = env.store.listLogs({ gameId: '#1', channelId: 'C1' });
     assert.equal(logs.length, 1);
     assert.equal(logs[0].state, 'on');
-    assert.ok(logs[0].name.startsWith('阿卡姆 · '), `log name should be <桌名> · <MMDD-HHmm>, got ${logs[0].name}`);
+    assert.equal(logs[0].name, '阿卡姆', '自动开的日志名 = 桌名（设定名优先，未设定才是带日期的回退名）');
     assert.equal(env.store.getGame('G1', '#1')?.currentLogId, logs[0].id);
 
     assert.ok(reply.content.includes('#1'));
@@ -279,7 +279,7 @@ describe('/game switch', () => {
 
     // 日志按场景隔离：切局不会把日志换走，本场景自己的日志继续记录
     const list2 = await route(makeContext({ command: 'log', sub: 'list', channelId: scene1, parentChannelId: 'C1', userId: 'U1' }, env.platform), env.deps);
-    assert.ok(list2.content.includes('阿卡姆 · '), list2.content);
+    assert.ok(list2.content.includes('阿卡姆'), list2.content);
 
     // …and switching back restores everything
     await route(

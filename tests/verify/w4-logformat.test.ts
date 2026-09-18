@@ -251,7 +251,7 @@ describe('W4 · 真实 jsonStore 落盘', () => {
     assert.equal(basename(join(env.dir, 'logs', file.name)), file.name);
   });
 
-  test('未绑定局的场景日志回退成 <日志名>_<日志名>.txt', () => {
+  test('未绑定局的场景日志：会话名 = 日志名，重复段省略成 <日志名>.txt', () => {
     const dir = tempDir('scenelog');
     const store = createJsonStore({ dir });
     store.putLog({
@@ -266,7 +266,7 @@ describe('W4 · 真实 jsonStore 落盘', () => {
       endedAt: null,
       fileName: null,
     });
-    assert.equal(basename(store.logFilePath(store.getLog('L1')!)), '单人团_单人团.txt');
+    assert.equal(basename(store.logFilePath(store.getLog('L1')!)), '单人团.txt');
   });
 });
 

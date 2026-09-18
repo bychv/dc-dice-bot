@@ -14,6 +14,7 @@
     "check": "npm run typecheck && npm run spec:check && npm test",
     "deploy": "node --env-file-if-exists=.env src/bot/deploy.ts",
     "sync": "node --env-file-if-exists=.env scripts/sync-commands.ts",
+    "migrate-logs": "node --env-file-if-exists=.env scripts/migrate-log-names.ts",
     "start": "node --env-file-if-exists=.env src/bot/main.ts",
     "info": "node --env-file-if-exists=.env scripts/discord-info.ts",
     "perms": "node --env-file-if-exists=.env scripts/discord-perms.ts"

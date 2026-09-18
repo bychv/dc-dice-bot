@@ -22,7 +22,9 @@ import {
   diceLogSessionName,
   formatDiceLogLine,
   formatDiceTimestamp,
+  isOutOfCharacterText,
 } from '../../src/bot/logFormat.ts';
+import { fmtStamp } from '../../src/bot/handlers/format.ts';
 import { createJsonStore, createJsonStoreWithExtras } from '../../src/store/jsonStore.ts';
 
 /** 沙箱不允许写系统临时目录（EPERM），测试数据一律放在包内 .tmp/. */
@@ -144,19 +146,22 @@ describe('Dice! 导出文件名', () => {
 
   test('超长按 UTF-8 字节截断，且不切开多字节/代理对字符', () => {
     const cjk = '甲'.repeat(200);
-    const cjkName = diceLogFileName(cjk, cjk);
+    const cjkName = diceLogFileName(cjk, '第一夜');
     const [cjkSession, cjkLog] = cjkName.replace(/\.txt$/, '').split('_');
     assert.equal(Buffer.byteLength(cjkSession, 'utf8'), 78, '80 字节上限内最多 26 个 3 字节汉字');
     assert.equal(Array.from(cjkSession).length, 26);
-    assert.equal(Buffer.byteLength(cjkLog, 'utf8'), 78);
+    assert.equal(cjkLog, '第一夜');
     assert.ok(Buffer.byteLength(cjkName, 'utf8') < 255, '单个文件名必须远低于 ext4 的 255 字节上限');
 
     const astral = '𝔻'.repeat(30); // 每个 4 字节
-    const astralName = diceLogFileName(astral, astral);
+    const astralName = diceLogFileName(astral, '夜');
     const part = astralName.slice(0, astralName.indexOf('_'));
     assert.equal(Buffer.byteLength(part, 'utf8'), 80);
     assert.equal(Array.from(part).length, 20, '代理对应完整，不出现半个字符');
     assert.ok(astralName.endsWith('.txt'));
+
+    // 两段同名（自动开的日志名 = 桌名）：省略重复段
+    assert.equal(diceLogFileName(astral, astral), `${'𝔻'.repeat(20)}.txt`);
   });
 });
 
@@ -214,7 +219,8 @@ describe('Dice! 日志导出', () => {
     store.setSceneGame('C1', 'G1', null);
     store.putLog(logRecord('单人团', null, 'C1'));
     const scenePath = store.logFilePath(store.getLog('L1')!);
-    assert.equal(basename(scenePath), '单人团_单人团.txt');
+    // 会话名 = 日志名（无局回退）⇒ 重复段省略
+    assert.equal(basename(scenePath), '单人团.txt');
 
     // gameId 指向不存在的局 → 回退日志名
     assert.equal(diceLogSessionName(logRecord('散场', '#9'), () => null), '散场');
@@ -243,5 +249,32 @@ describe('Dice! 日志导出', () => {
     assert.equal(file.name, '阿卡姆_第一夜.txt');
     assert.equal(file.data.toString('utf8'), '甲(U1) 2026-03-09 04:05:06\n我们进入地窖\n\n');
     assert.equal(store.getLog('L1')?.fileName, '阿卡姆_第一夜.txt');
+  });
+});
+
+describe('场外话（PL/OOC）与特殊字符', () => {
+  test('全角/半角括号开头的玩家发言都跳过；正文里出现括号不受影响', () => {
+    assert.equal(isOutOfCharacterText('（我明天可能晚点到）'), true);
+    assert.equal(isOutOfCharacterText('(OOC：先吃饭)'), true);
+    assert.equal(isOutOfCharacterText('   （缩进也算）'), true);
+    assert.equal(isOutOfCharacterText('他说（小声）别动'), false, '括号在正文里不算场外');
+    assert.equal(isOutOfCharacterText('我（甲）走前面'), false);
+    assert.equal(isOutOfCharacterText('【甲】我走前面'), false);
+    assert.equal(isOutOfCharacterText(''), false);
+  });
+
+  test('`()`、`#`、弯引号等特殊字符原样进日志，不做转义', () => {
+    const text = '我拿起枪（柯尔特 M1911）#2 “砰”#1';
+    assert.equal(
+      formatDiceLogLine({ name: '甲', uid: 'U1', at: new Date(2026, 8, 18, 22, 2, 11), text }),
+      `甲(U1) 2026-09-18 22:02:11\n${text}\n\n`,
+    );
+  });
+
+  test('默认名字（未设定时的回退）用带完整日期的时间戳', () => {
+    assert.equal(fmtStamp(new Date(2026, 8, 18, 22, 2)), '2026-09-18 2202');
+    assert.equal(fmtStamp(new Date(2026, 0, 2, 3, 4)), '2026-01-02 0304');
+    // 带完整日期才能被 logPainter 的日期正则认出（也能按名字排序）
+    assert.match(fmtStamp(new Date(2026, 8, 18, 22, 2)), /\d{4}-\d{1,2}-\d{1,2} \d{4}/);
   });
 });

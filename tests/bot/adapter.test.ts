@@ -141,17 +141,22 @@ describe('createLogRecorder', () => {
     const record = createLogRecorder(env.store);
 
     record(fakeMessage(env));
-    record(fakeMessage(env, { content: '（这是 KP 的暗骰记录）' }));
+    record(fakeMessage(env, { content: '这是 KP 的暗骰记录' }));
     const lines = env.store.logLines(log.id);
     assert.equal(lines.length, 2);
     assert.match(lines[0] ?? '', diceLine('我们进入地窖'));
-    assert.match(lines[1] ?? '', diceLine('（这是 KP 的暗骰记录）'));
+    assert.match(lines[1] ?? '', diceLine('这是 KP 的暗骰记录'));
 
     record(fakeMessage(env, { bot: true, content: '我是骰娘' }));
     assert.equal(env.store.logLines(log.id).length, 2, 'bot messages are not logged');
 
     record(fakeMessage(env, { channelId: 'CX' }));
     assert.equal(env.store.logLines(log.id).length, 2, 'other scenes are not logged');
+
+    // 场外话（以全/半角括号开头）不入日志
+    record(fakeMessage(env, { content: '（我明天可能晚点到）' }));
+    record(fakeMessage(env, { content: '(OOC：先吃饭)' }));
+    assert.equal(env.store.logLines(log.id).length, 2, 'PL 场外话必须跳过');
   });
 
   test('records attachments and ignores empty messages', async () => {    const env = makeEnv();

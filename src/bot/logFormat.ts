@@ -122,9 +122,23 @@ function sanitizeFilePart(value: string, fallback: string): string {
 /**
  * Dice! `DiceSession::log_new` 的文件名：`<会话名>_<日志名>.txt`。
  * 空值分别回退 `session` / `log`；非法字符替换为 `_`，超长按 UTF-8 字节截断。
+ * **两段相同时省略重复段**（`/game start` 自动开的日志名就是桌名）：
+ * `阿卡姆_阿卡姆.txt` → `阿卡姆.txt`；显式命名（`/log new name:第一夜`）仍为 `阿卡姆_第一夜.txt`。
  */
 export function diceLogFileName(sessionName: string, logName: string): string {
-  return `${sanitizeFilePart(sessionName, 'session')}_${sanitizeFilePart(logName, 'log')}.txt`;
+  const session = sanitizeFilePart(sessionName, 'session');
+  const log = sanitizeFilePart(logName, 'log');
+  return session === log ? `${session}.txt` : `${session}_${log}.txt`;
+}
+
+/**
+ * 摊开在场发言（PL/OOC）：Discord 里玩家用括号说场外话，这类行**不进日志**。
+ * 全角 `（）` 与半角 `()` 一视同仁；只看**开头**（`（图）` 会被跳过，但 `（笑）你好` 也会——
+ * 与 logPainter 的「过滤 () 发言」开关同口径：以括号开头的整条消息视为场外）。
+ */
+export function isOutOfCharacterText(text: string): boolean {
+  const trimmed = (text ?? '').trimStart();
+  return trimmed.startsWith('(') || trimmed.startsWith('（');
 }
 
 /**

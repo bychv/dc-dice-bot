@@ -172,9 +172,9 @@ export async function startGame(
 
   let log: LogRecord | null = null;
   if (input.openLog !== false) {
-    const base = input.logName && input.logName.trim().length > 0
-      ? input.logName.trim()
-      : `${input.name} · ${fmtStamp(deps.now())}`;
+    // 日志名：优先 `/log new name:` 传进来的设定名；没设定就回退**桌名**
+    // （桌名本身要么是设定的名字，要么是带完整日期的 `<频道名> · <YYYY-MM-DD HHMM>`）。
+    const base = input.logName && input.logName.trim().length > 0 ? input.logName.trim() : input.name;
     log = createLog(deps, {
       name: base,
       gameId: game.id,

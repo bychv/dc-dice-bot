@@ -53,7 +53,7 @@ describe('T4 · /game start', () => {
     const logs = env.store.listLogs({ gameId: '#1', channelId: 'C1', guildId: 'G1' });
     assert.equal(logs.length, 1);
     assert.equal(logs[0].state, 'on');
-    assert.ok(logs[0].name.startsWith('阿卡姆 · '), `日志名应为 <桌名> · <MMDD-HHmm>，实际 ${logs[0].name}`);
+    assert.equal(logs[0].name, '阿卡姆', `自动日志名 = 桌名（设定名优先），实际 ${logs[0].name}`);
     assert.equal(game.currentLogId, logs[0].id);
   });
 
@@ -181,7 +181,7 @@ describe('T4 · /game switch 与上下文跟随', () => {
 
     const list2 = await route(inT1({ command: 'log', sub: 'list' }), env.deps);
     // 规格更新：日志按场景隔离（谁开的日志记谁的发言），不随局切换而被换走
-    assert.ok(list2.content.includes('一 · '), `日志不得随局切换：${list2.content}`);
+    assert.ok(list2.content.includes('「一」'), `日志不得随局切换：${list2.content}`);
 
     // 切回 #1
     await route(inT1({ command: 'game', sub: 'switch', values: { game: '#1' } }), env.deps);
@@ -312,7 +312,7 @@ describe('T4 · /log 生命周期', () => {
 
     const logs = env.store.listLogs({ gameId: '#1', channelId: t1, guildId: 'G1' });
     assert.equal(logs.length, 2);
-    const first = logs.find((l) => l.name.startsWith('一 · '));
+    const first = logs.find((l) => l.name === '一');
     const second = logs.find((l) => l.name === '第二夜');
     assert.equal(first?.state, 'off');
     assert.equal(first?.endedAt, null, '暂停日志不得被自动结束');

@@ -8,9 +8,14 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-/** `MMDD-HHmm`, used for default table / log names (docs §10.1). */
+/**
+ * 回退用的时间戳名字：`YYYY-MM-DD HHMM`（如 `2026-09-18 2202`）。
+ * 用完整日期而不是 Dice! 的裸 Unix 秒（`DiceSession.cpp:198` `to_string(tStart)`）：
+ * 名字/文件名里带完整日期才能排序、才能被 logPainter 那类解析器认出日期；冒号是非法文件名字符，所以时分不加冒号。
+ */
 export function fmtStamp(date: Date): string {
-  return `${pad2(date.getMonth() + 1)}${pad2(date.getDate())}-${pad2(date.getHours())}${pad2(date.getMinutes())}`;
+  const yyyy = String(date.getFullYear()).padStart(4, '0');
+  return `${yyyy}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}${pad2(date.getMinutes())}`;
 }
 
 /** `MM-DD HH:mm`, used when listing logs (docs §11.1). */
