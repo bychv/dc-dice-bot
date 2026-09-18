@@ -132,9 +132,11 @@ export function diceLogFileName(sessionName: string, logName: string): string {
 }
 
 /**
- * 摊开在场发言（PL/OOC）：Discord 里玩家用括号说场外话，这类行**不进日志**。
- * 全角 `（）` 与半角 `()` 一视同仁；只看**开头**（`（图）` 会被跳过，但 `（笑）你好` 也会——
- * 与 logPainter 的「过滤 () 发言」开关同口径：以括号开头的整条消息视为场外）。
+ * **后处理**用的判定：一条日志行是不是场外话（PL/OOC，Discord 里用括号说场外话）。
+ * 全角 `（）` 与半角 `()` 一视同仁，只看**开头**。
+ *
+ * 注意：**写入日志时不做这个过滤** —— 日志保持"原样记录"，要不要剔掉场外话交给后处理
+ * （logPainter 的「过滤 () 发言」开关、导出后自行处理等）。此函数留给以后的导出选项。
  */
 export function isOutOfCharacterText(text: string): boolean {
   const trimmed = (text ?? '').trimStart();

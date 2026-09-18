@@ -153,10 +153,12 @@ describe('createLogRecorder', () => {
     record(fakeMessage(env, { channelId: 'CX' }));
     assert.equal(env.store.logLines(log.id).length, 2, 'other scenes are not logged');
 
-    // 场外话（以全/半角括号开头）不入日志
+    // 场外话（以全/半角括号开头）也照原样入日志——过滤属于后处理，写入端不过滤
     record(fakeMessage(env, { content: '（我明天可能晚点到）' }));
     record(fakeMessage(env, { content: '(OOC：先吃饭)' }));
-    assert.equal(env.store.logLines(log.id).length, 2, 'PL 场外话必须跳过');
+    assert.equal(env.store.logLines(log.id).length, 4, '括号发言也要记录');
+    assert.match(env.store.logLines(log.id)[2] ?? '', diceLine('（我明天可能晚点到）'));
+    assert.match(env.store.logLines(log.id)[3] ?? '', diceLine('\\(OOC：先吃饭\\)'));
   });
 
   test('records attachments and ignores empty messages', async () => {    const env = makeEnv();

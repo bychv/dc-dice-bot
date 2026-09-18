@@ -252,8 +252,8 @@ describe('Dice! 日志导出', () => {
   });
 });
 
-describe('场外话（PL/OOC）与特殊字符', () => {
-  test('全角/半角括号开头的玩家发言都跳过；正文里出现括号不受影响', () => {
+describe('场外话判定（后处理用）与特殊字符', () => {
+  test('全角/半角括号开头的判定；正文里出现括号不算', () => {
     assert.equal(isOutOfCharacterText('（我明天可能晚点到）'), true);
     assert.equal(isOutOfCharacterText('(OOC：先吃饭)'), true);
     assert.equal(isOutOfCharacterText('   （缩进也算）'), true);

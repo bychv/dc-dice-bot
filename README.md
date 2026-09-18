@@ -152,7 +152,7 @@ npm run check                    # 上面三件事一起跑
 | **词库** | `/help` 无参 = Dice! 内置 `strHlpMsg` 总览，词条来自 `ref/Dice/Dice/GlobalVar.cpp` 抽取的 **351 条 messages + 148 条 HelpDoc 词条**（`scripts/import-dice-library.ts` 生成，可重跑） |
 | 外部词库 | `DICE_LIBRARY_DIR=<目录>` 可覆盖/补充（`*.json`、简单 `*.yaml`，外部优先于内置）；Dice! 的规则书与牌堆词库是运行时下载的，仓库内没有，请用这个口子注入 |
 | **日志格式** | 行 `名字(uid) YYYY-MM-DD HH:MM:SS\n内容\n\n`；文件名 `<局名>_<日志名>.txt`（两段同名时省略重复段 → `阿卡姆.txt`）；玩家消息与骰娘回执都入日志，`/log` 指令自身不入（对齐 `DiceEvent.cpp:188/222/239`、`DiceSession.cpp:200`） |
-| **日志内容规则** | 场外话（全/半角 `(` `（` 开头的玩家消息）**不入日志**；`()  #  “”` 等特殊字符**原样保留**不转义；时间戳固定 `YYYY-MM-DD HH:MM:SS`，回退用的名字用带完整日期的 `YYYY-MM-DD HHMM`（Dice! 用的是裸 Unix 秒） |
+| **日志内容规则** | **写入端不过滤内容**：场外话（全/半角 `(` `（` 开头）也照原样记录，剔除交给后处理（logPainter 的「过滤 () 发言」开关等）；`()  #  “”` 等特殊字符不转义；时间戳固定 `YYYY-MM-DD HH:MM:SS`，回退用的名字用带完整日期的 `YYYY-MM-DD HHMM` |
 | **日志改名迁移** | `npm run migrate-logs`（默认 dry-run，`--apply` 才写盘并备份 `logs.json`）：把旧的 `<桌名> · <时间戳>` 自动日志名迁成桌名，已结束的连导出文件一起改名，同服重名自动加 `_<logId>` |
 | **日志里的名字** | 角色卡名（局 → 本场景 → 父频道 → 全局）→ 称呼 `/nn` → Discord 显示名；骰娘那行用服务器昵称 → 用户名。**每行重新解析**：中途 `/pc rename`、`/nn set`、切局只影响之后的行（对齐 `CharacterCard.cpp:737` `idx_pc`） |
 | **logPainter 兼容** | 导出的 `.txt` 可直接粘进 `ref/logPainter`（`index.src.html:842` 的 `regHeader2` 正好匹配我们的行头；正文续行挂上一个说话人），已用它的正则实测 |

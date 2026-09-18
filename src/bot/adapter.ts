@@ -26,7 +26,7 @@ import type {
 } from '../contracts/bot.ts';
 import type { BotStore } from '../contracts/store.ts';
 import { handleButtonClick } from './confirm.ts';
-import { appendBotReplyLine, appendUserLogLine, isOutOfCharacterText } from './logFormat.ts';
+import { appendBotReplyLine, appendUserLogLine } from './logFormat.ts';
 import { botSpeakerName, speakerName } from './logSpeaker.ts';
 import { route } from './router.ts';
 
@@ -424,6 +424,9 @@ export async function handleButtonInteraction(
  * `messageCreate` → log lines (docs §11.1): 每条玩家消息按 **Dice! 行格式**写入该场景当前 `on`
  * 的日志；store 负责按场景/局决定进哪条日志（Bot 自己的消息不记录）。
  *
+ * **不做内容过滤**：场外话（以括号开头的 PL 发言）也照原样入日志——过滤属于**后处理**
+ * （logPainter 的「过滤 () 发言」开关、导出后自行处理），写入端保持"原样记录"。
+ *
  * 说话人名字按 `speakerName()` 解析：**角色卡名 > 称呼(/nn) > Discord 显示名**，
  * 且每行重新解析，所以中途换卡名/称呼会从下一行开始生效。
  */
@@ -447,8 +450,6 @@ export function createLogRecorder(store: BotStore): (message: Message) => void {
         : '';
       const line = [text, attachments].filter((part) => part.length > 0).join(' ');
       if (line.length === 0) return;
-      // 场外话（以全/半角括号开头）不入日志，与 logPainter 的「过滤 () 发言」同口径
-      if (isOutOfCharacterText(line)) return;
       const input = { name, uid: userId, at: new Date(), text: line };
       const appended = appendUserLogLine(store, channelId, input);
       // 子区消息：子区本身常常不是「绑定场景」（游戏绑的是父频道/主场景），
