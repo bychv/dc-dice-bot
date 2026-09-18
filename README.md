@@ -150,6 +150,8 @@ npm run check                    # 上面三件事一起跑
 | **词库** | `/help` 无参 = Dice! 内置 `strHlpMsg` 总览，词条来自 `ref/Dice/Dice/GlobalVar.cpp` 抽取的 **351 条 messages + 148 条 HelpDoc 词条**（`scripts/import-dice-library.ts` 生成，可重跑） |
 | 外部词库 | `DICE_LIBRARY_DIR=<目录>` 可覆盖/补充（`*.json`、简单 `*.yaml`，外部优先于内置）；Dice! 的规则书与牌堆词库是运行时下载的，仓库内没有，请用这个口子注入 |
 | **日志格式** | 行 `名字(uid) YYYY-MM-DD HH:MM:SS\n内容\n\n`；文件名 `<局名>_<日志名>.txt`；玩家消息与骰娘回执都入日志，`/log` 指令自身不入（对齐 `DiceEvent.cpp:188/222/239`、`DiceSession.cpp:200`） |
+| **日志里的名字** | 角色卡名（局 → 本场景 → 父频道 → 全局）→ 称呼 `/nn` → Discord 显示名；骰娘那行用服务器昵称 → 用户名。**每行重新解析**：中途 `/pc rename`、`/nn set`、切局只影响之后的行（对齐 `CharacterCard.cpp:737` `idx_pc`） |
+| **logPainter 兼容** | 导出的 `.txt` 可直接粘进 `ref/logPainter`（`index.src.html:842` 的 `regHeader2` 正好匹配我们的行头；正文续行挂上一个说话人），已用它的正则实测 |
 | 二次确认 | `/pc clr`、`/st clr` 首次只列销毁范围 + 「确认执行/取消」按钮，仅发起者可点，5 分钟过期（对齐规格 §16.6） |
 
 ## 已知限制

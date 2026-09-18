@@ -27,6 +27,7 @@ import type {
 import type { BotStore } from '../contracts/store.ts';
 import { handleButtonClick } from './confirm.ts';
 import { appendBotReplyLine, appendUserLogLine } from './logFormat.ts';
+import { botSpeakerName, speakerName } from './logSpeaker.ts';
 import { route } from './router.ts';
 
 // ---------------------------------------------------------------------------
@@ -344,7 +345,14 @@ function logBotReply(
 ): void {
   try {
     const self = interaction.client.user;
-    const input = { uid: self?.id ?? '0', name: self?.username ?? 'Dice', at: deps.now(), text };
+    // 骰娘那行用**服务器里的昵称**（群里给它设定的名字），没设再回退 Discord 用户名
+    const nickname = interaction.guild?.members?.me?.nickname ?? null;
+    const input = {
+      uid: self?.id ?? '0',
+      name: botSpeakerName(nickname, self?.username),
+      at: deps.now(),
+      text,
+    };
     const appended = appendBotReplyLine(deps.store, interaction.channelId, input);
     if (appended === 0) {
       const channel = interaction.channel as
@@ -415,6 +423,9 @@ export async function handleButtonInteraction(
 /**
  * `messageCreate` → log lines (docs §11.1): 每条玩家消息按 **Dice! 行格式**写入该场景当前 `on`
  * 的日志；store 负责按场景/局决定进哪条日志（Bot 自己的消息不记录）。
+ *
+ * 说话人名字按 `speakerName()` 解析：**角色卡名 > 称呼(/nn) > Discord 显示名**，
+ * 且每行重新解析，所以中途换卡名/称呼会从下一行开始生效。
  */
 export function createLogRecorder(store: BotStore): (message: Message) => void {
   return (message: Message): void => {
@@ -422,21 +433,25 @@ export function createLogRecorder(store: BotStore): (message: Message) => void {
       if (message.author?.bot) return;
       const channelId = message.channelId;
       if (!channelId) return;
-      const name = message.member?.displayName ?? message.author?.username ?? '未知';
+      const parentId = message.channel?.isThread?.() ? (message.channel.parentId ?? null) : null;
+      const userId = message.author?.id ?? '0';
+      const displayName = message.member?.displayName ?? message.author?.username ?? '未知';
+      const name = speakerName(
+        store,
+        { guildId: message.guildId ?? null, channelId, parentChannelId: parentId, userId },
+        displayName,
+      );
       const text = message.content?.trim() ?? '';
       const attachments = message.attachments?.size
         ? [...message.attachments.values()].map((file) => `[附件 ${file.name}]`).join(' ')
         : '';
       const line = [text, attachments].filter((part) => part.length > 0).join(' ');
       if (line.length === 0) return;
-      const input = { name, uid: message.author?.id ?? '0', at: new Date(), text: line };
+      const input = { name, uid: userId, at: new Date(), text: line };
       const appended = appendUserLogLine(store, channelId, input);
       // 子区消息：子区本身常常不是「绑定场景」（游戏绑的是父频道/主场景），
       // 这时按父频道再投一次，否则"在子区里说话"会完全不入日志。
-      if (appended === 0) {
-        const parentId = message.channel?.isThread?.() ? message.channel.parentId : null;
-        if (parentId) appendUserLogLine(store, parentId, input);
-      }
+      if (appended === 0 && parentId) appendUserLogLine(store, parentId, input);
     } catch {
       // logging must never take the client down
     }

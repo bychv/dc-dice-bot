@@ -68,23 +68,61 @@ export interface BindingTarget {
   key: string;
 }
 
+/** 解析角色卡 / 称呼所需的最小上下文（`InteractionContext` 与 `messageCreate` 都能提供）。 */
+export interface SceneKey {
+  guildId: string | null;
+  channelId: string;
+  parentChannelId?: string | null;
+  userId: string;
+}
+
 /**
  * 局 > 场景 > 全局 default card (docs §10.2)。
  * 场景这一层按「当前场景 → 父频道」两级查：子区里没单独绑卡时继承父频道的绑定，
  * 这样在频道里 tag 的卡进子区照样能用（写入口径不变，仍是当前场景，见 `sheetBindingScope`）。
  */
-export function bindingCandidates(ctx: InteractionContext, deps: HandlerDeps): BindingTarget[] {
+export function bindingCandidatesFor(store: BotStore, key: SceneKey): BindingTarget[] {
   const targets: BindingTarget[] = [];
-  const game = currentGame(ctx, deps);
+  const gameId =
+    store.getSceneGame(key.channelId) ??
+    (key.parentChannelId && key.parentChannelId !== key.channelId
+      ? store.getSceneGame(key.parentChannelId)
+      : null);
+  const game = key.guildId && gameId ? store.getGame(key.guildId, gameId) : null;
   if (game) targets.push({ scope: 'game', key: game.id });
-  if (ctx.guildId) {
-    targets.push({ scope: 'scene', key: ctx.channelId });
-    if (ctx.parentChannelId && ctx.parentChannelId !== ctx.channelId) {
-      targets.push({ scope: 'scene', key: ctx.parentChannelId });
+  if (key.guildId) {
+    targets.push({ scope: 'scene', key: key.channelId });
+    if (key.parentChannelId && key.parentChannelId !== key.channelId) {
+      targets.push({ scope: 'scene', key: key.parentChannelId });
     }
   }
   targets.push({ scope: 'global', key: GLOBAL_BINDING_KEY });
   return targets;
+}
+
+/** `InteractionContext` 版本（`/rc` 等处理器用）。 */
+export function bindingCandidates(ctx: InteractionContext, deps: HandlerDeps): BindingTarget[] {
+  return bindingCandidatesFor(deps.store, ctx);
+}
+
+/** 只按 store + 场景解析角色卡（`/log` 记录消息时也要用，但没有完整 deps）。 */
+export function resolveSheetFor(store: BotStore, key: SceneKey): CharacterSheet | null {
+  for (const target of bindingCandidatesFor(store, key)) {
+    const name = store.getBinding(target.scope, target.key, key.userId);
+    if (!name) continue;
+    const sheet = store.getSheet(key.userId, name);
+    if (sheet) return sheet;
+  }
+  return null;
+}
+
+/** 称呼（`/nn`）：本场景 > 全局，与 `resolveNick` 同一口径。 */
+export function resolveNickFor(store: BotStore, key: SceneKey): string | null {
+  const nicks = nickStore(store);
+  return (
+    nicks.getNick(key.guildId, key.channelId, key.userId) ??
+    nicks.getGlobalNick(key.guildId, key.userId)
+  );
 }
 
 /** Where `/pc tag` writes: the session when there is one, otherwise the scene / global default. */
@@ -96,13 +134,7 @@ export function sheetBindingScope(ctx: InteractionContext, deps: HandlerDeps): B
 }
 
 export function resolveSheet(ctx: InteractionContext, deps: HandlerDeps): CharacterSheet | null {
-  for (const target of bindingCandidates(ctx, deps)) {
-    const name = deps.store.getBinding(target.scope, target.key, ctx.userId);
-    if (!name) continue;
-    const sheet = deps.store.getSheet(ctx.userId, name);
-    if (sheet) return sheet;
-  }
-  return null;
+  return resolveSheetFor(deps.store, ctx);
 }
 
 /**
@@ -288,9 +320,5 @@ export function ruleSetStore(store: BotStore): RuleSetStore {
 
 /** Display nickname: 频道称呼 > 全局称呼 (docs §12.1). */
 export function resolveNick(ctx: InteractionContext, deps: HandlerDeps): string | null {
-  const nicks = nickStore(deps.store);
-  return (
-    nicks.getNick(ctx.guildId, ctx.channelId, ctx.userId) ??
-    nicks.getGlobalNick(ctx.guildId, ctx.userId)
-  );
+  return resolveNickFor(deps.store, ctx);
 }

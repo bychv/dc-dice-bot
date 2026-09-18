@@ -156,6 +156,8 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
 
   /** tmp + rename so a crash can never truncate an existing file. */
   private writeCollection(key: Collection): void {
+    // 目录被删（测试清理 / 人工误删）时重建：内存里的状态才是真相，写不进去等于丢数据
+    mkdirSync(this.dir, { recursive: true });
     const target = join(this.dir, FILES[key]);
     const tmp = `${target}.tmp`;
     writeFileSync(tmp, `${JSON.stringify(this.payload(key), null, 2)}\n`, 'utf8');
