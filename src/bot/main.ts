@@ -21,6 +21,7 @@ import {
   handleButtonInteraction,
   handleInteraction,
 } from './adapter.ts';
+import { createAuditLogger } from './audit.ts';
 import { registerGuildCommands } from './command-sync.ts';
 import { createPendingActions } from './confirm.ts';
 import { COMMANDS } from './manifest.ts';
@@ -149,16 +150,23 @@ function describeError(error: unknown): string {
   return parts.join(' | ');
 }
 
+/** 运行日志：每条交互记「命令 + 解析到的上下文 + 回执摘要」，排查跨子区/绑卡问题用（audit.ts）。 */
+const audit = createAuditLogger(deps);
+
 client.on(Events.InteractionCreate, (interaction) => {
   // 破坏性命令的确认/取消按钮 (docs §16.6)
   if (interaction.isButton()) {
+    audit.button(interaction.customId, interaction.user.id);
     void handleButtonInteraction(interaction, deps).catch((error: unknown) => {
       console.error(`处理按钮 ${interaction.customId} 失败：${describeError(error)}`);
     });
     return;
   }
   if (!interaction.isChatInputCommand()) return;
-  void handleInteraction(interaction, deps).catch((error: unknown) => {
+  void handleInteraction(interaction, deps, {
+    onContext: (context) => audit.context(context),
+    onPayload: (_context, payload) => audit.result(payload),
+  }).catch((error: unknown) => {
     console.error(`处理 /${interaction.commandName} 失败：${describeError(error)}`);
   });
 });

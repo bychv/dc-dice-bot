@@ -35,10 +35,24 @@ export const GLOBAL_BINDING_KEY = '@global';
 
 // ---- scene / game -------------------------------------------------------
 
+/**
+ * 场景（频道或子区）绑定的局；**子区没有自己的指针时继承父频道的**——
+ * 子区是父频道的子区域，在 #频道 里开的局/绑的卡，进它的子区说话理应继续生效
+ * （否则「跨子区使用」会忽然找不到角色卡）。
+ */
+function sceneGameId(ctx: InteractionContext, deps: HandlerDeps): string | null {
+  const own = deps.store.getSceneGame(ctx.channelId);
+  if (own) return own;
+  if (ctx.parentChannelId && ctx.parentChannelId !== ctx.channelId) {
+    return deps.store.getSceneGame(ctx.parentChannelId);
+  }
+  return null;
+}
+
 /** The session the current scene (channel **or** thread) points at, if any. */
 export function currentGame(ctx: InteractionContext, deps: HandlerDeps): GameRecord | null {
   if (!ctx.guildId) return null;
-  const id = deps.store.getSceneGame(ctx.channelId);
+  const id = sceneGameId(ctx, deps);
   if (!id) return null;
   return deps.store.getGame(ctx.guildId, id);
 }
@@ -54,12 +68,21 @@ export interface BindingTarget {
   key: string;
 }
 
-/** 局 > 场景 > 全局 default card (docs §10.2). */
+/**
+ * 局 > 场景 > 全局 default card (docs §10.2)。
+ * 场景这一层按「当前场景 → 父频道」两级查：子区里没单独绑卡时继承父频道的绑定，
+ * 这样在频道里 tag 的卡进子区照样能用（写入口径不变，仍是当前场景，见 `sheetBindingScope`）。
+ */
 export function bindingCandidates(ctx: InteractionContext, deps: HandlerDeps): BindingTarget[] {
   const targets: BindingTarget[] = [];
   const game = currentGame(ctx, deps);
   if (game) targets.push({ scope: 'game', key: game.id });
-  if (ctx.guildId) targets.push({ scope: 'scene', key: ctx.channelId });
+  if (ctx.guildId) {
+    targets.push({ scope: 'scene', key: ctx.channelId });
+    if (ctx.parentChannelId && ctx.parentChannelId !== ctx.channelId) {
+      targets.push({ scope: 'scene', key: ctx.parentChannelId });
+    }
+  }
   targets.push({ scope: 'global', key: GLOBAL_BINDING_KEY });
   return targets;
 }
@@ -117,7 +140,7 @@ export interface ResolvedRule {
   source: 'game' | 'scene' | 'default';
 }
 
-/** 本局房规 → 场景房规 → 骰主默认 (docs §8.1/§10.2). */
+/** 本局房规 → 场景房规 → 骰主默认 (docs §8.1/§10.2)；场景房规同样支持子区继承父频道。 */
 export function resolveRule(ctx: InteractionContext, deps: HandlerDeps): ResolvedRule {
   const game = currentGame(ctx, deps);
   if (game) {
@@ -129,6 +152,12 @@ export function resolveRule(ctx: InteractionContext, deps: HandlerDeps): Resolve
   const sceneRule = deps.store.getSceneRule(ctx.channelId);
   if (sceneRule !== null && HOUSE_RULES.includes(sceneRule)) {
     return { rule: sceneRule, source: 'scene' };
+  }
+  if (ctx.parentChannelId && ctx.parentChannelId !== ctx.channelId) {
+    const parentRule = deps.store.getSceneRule(ctx.parentChannelId);
+    if (parentRule !== null && HOUSE_RULES.includes(parentRule)) {
+      return { rule: parentRule, source: 'scene' };
+    }
   }
   return { rule: DEFAULT_HOUSE_RULE, source: 'default' };
 }

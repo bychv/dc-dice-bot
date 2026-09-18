@@ -366,13 +366,27 @@ function replyComponents(
   return payload.components as unknown as NonNullable<InteractionReplyOptions['components']>;
 }
 
+/**
+ * Hooks for the run log (`audit.ts`): the Lead wires them in `main.ts` so every dispatch is
+ * traceable (command + resolved context + verdict) without handlers knowing about logging.
+ */
+export interface InteractionHooks {
+  /** 上下文解析完成、派发之前 */
+  onContext?(context: InteractionContext): void;
+  /** 回执已生成、发送之前 */
+  onPayload?(context: InteractionContext, payload: ReplyPayload): void;
+}
+
 /** Full dispatch for one slash command. */
 export async function handleInteraction(
   interaction: ChatInputCommandInteraction,
   deps: HandlerDeps,
+  hooks?: InteractionHooks,
 ): Promise<void> {
   const context = await toInteractionContext(interaction);
+  hooks?.onContext?.(context);
   const payload = await route(context, deps);
+  hooks?.onPayload?.(context, payload);
   await respond(interaction, payload, deps);
 }
 

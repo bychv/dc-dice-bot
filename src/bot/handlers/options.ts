@@ -52,14 +52,14 @@ export function subcommand(ctx: InteractionContext): string | null {
 }
 
 export function ok(content: string, files?: ReplyPayload['files']): ReplyPayload {
-  const payload: ReplyPayload = { content };
+  const payload: ReplyPayload = { content, ok: true };
   if (files && files.length > 0) payload.files = files;
   return payload;
 }
 
 /** Errors / permission refusals are ephemeral so they do not spam the scene (docs §1.4/§16.6). */
 export function fail(content: string): ReplyPayload {
-  return { content, ephemeral: true };
+  return { content, ephemeral: true, ok: false };
 }
 
 /** Discord caps a message at 2000 chars; keep replies inside the limit (docs §1.5). */

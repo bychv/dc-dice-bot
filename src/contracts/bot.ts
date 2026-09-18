@@ -64,6 +64,11 @@ export interface ReplyPayload {
   files?: OutgoingFile[];
   /** 一次确认/取消按钮行（docs §16.6 破坏性操作的二次确认） */
   components?: ApiActionRow[];
+  /**
+   * 回执是不是"成功"结果：`ok()` 为 true、`fail()` 为 false，确认/按钮流程可能缺省。
+   * 只用于运行日志（`audit.ts`）与测试观察，不影响发送。
+   */
+  ok?: boolean;
 }
 
 /** 待确认动作：由 `/pc clr`、`/st clr` 之类的破坏性命令登记，按钮点击后执行。 */

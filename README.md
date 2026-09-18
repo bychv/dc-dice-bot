@@ -51,7 +51,33 @@ npm start        # 启动
 | `DISCORD_GUILD_ID` | 可选；填了就把命令注册到该服务器（即时生效），否则只注册全局（别名 `GUILD_ID`） |
 | `DISCORD_GUILD_IDS` | 可选；**多个**服务器 id（逗号/空格分隔），与 `DISCORD_GUILD_ID` 合并去重 |
 | `DCDICE_AUTO_SYNC_COMMANDS` | 可选；设 `0` 关闭启动/入群时的自动同步 |
+| `DCDICE_AUDIT_LOG` | 可选；设 `0` 关闭运行日志（默认开，见下） |
 | `DCDICE_DATA_DIR` | 可选；数据目录，默认 `./data` |
+
+## 运行日志（journald）
+
+每条 slash 命令写两行：**一行上下文 + 一行回执摘要**，用于事后排查"这个场景里为什么读不到卡 / 房规不对 / 子区没继承"：
+
+```text
+[2026-09-18 13:02:11] /rc user=甲(123456789012345678) scene=T7←C1 game=#1 阿卡姆 sheet=甲卡 rule=1(局) text="闪避"
+    ↳ FAIL(ephemeral) 当前场景没有生效的角色卡，无法确定「闪避」的成功率。子区与频道各自独立…
+```
+
+- `scene=T7←C1`：命令发生在子区 `T7`，父频道是 `C1`；直接写在频道里就没有箭头。
+- `game=`：解析到的局（没有则 `无`）；`sheet=`：解析到的角色卡（`无` = 这个场景按"局 → 本场景 → 父频道 → 全局"都找不到卡）。
+- `rule=`：生效房规与来源（局 / 场景 / 默认）；`text="…"` 是原始参数（单行、超长截断）。
+- 第二行：`OK/FAIL`（失败回执都是 `fail()` 产生的）、`public/ephemeral`、附件数、回执首行（≤200 字）。
+- 按钮（二次确认）也会留一行：`button confirm user=U1`。
+- 查看：
+
+```bash
+journalctl -u dcdice-bot -f                 # 实时
+journalctl -u dcdice-bot --since "10 min ago" | grep '↳'    # 只看回执摘要
+journalctl -u dcdice-bot --since today | grep '/rc '        # 只看某条命令
+```
+
+- 关闭：`.env` 里设 `DCDICE_AUDIT_LOG=0`（或只调低日志级别用 `journalctl` 过滤）。
+- 异常（抛错）仍走原来的 `处理 /xxx 失败：…` 行，两者互补：**正常返回的失败回执**只有运行日志能看到。
 
 ## 邀请 bot 到服务器（必须带 `bot` scope）
 

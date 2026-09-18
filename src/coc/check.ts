@@ -162,9 +162,22 @@ export function runCheck(dice: DiceEngine, text: string, opts: CheckOptions): Ch
   if (base === null) {
     const found = findAttrValue(opts.sheet, parsed.skillName);
     if (!found) {
+      // 两种原因分开报：没解析到卡（跨子区/跨频道的常见坑）≠ 卡里真的没这一项
+      if (!opts.sheet) {
+        return {
+          ok: false,
+          error:
+            `当前场景没有生效的角色卡，无法确定「${parsed.skillName}」的成功率。` +
+            '子区与频道各自独立（局内的卡绑定会覆盖局里所有场景，用 `/game` 建局最省事）；' +
+            '也可以直接在指令里给出成功率，例如 `/rc ' +
+            `${parsed.skillName} 50\`。`,
+        };
+      }
       return {
         ok: false,
-        error: `无法确定「${parsed.skillName}」的成功率：角色卡中没有该属性，请在指令中给出成功率`,
+        error:
+          `角色卡「${opts.sheet.name}」里没有「${parsed.skillName}」这一项，无法确定成功率。` +
+          `用 \`/st ${parsed.skillName}:60\` 录入，或直接在指令里给出成功率（例如 \`/rc ${parsed.skillName} 50\`）。`,
       };
     }
     const value = toInt(found.value);
