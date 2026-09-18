@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Discord CoC dice bot - TypeScript implementation of docs/Discord_CoC_Command_Set.md",
+  "license": "AGPL-3.0-or-later",
   "engines": {
     "node": ">=22.18"
   },

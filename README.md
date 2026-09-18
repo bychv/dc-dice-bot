@@ -2,6 +2,8 @@
 
 把 `docs/Discord_CoC_Command_Set.md` 的指令规格落成可运行的 Discord 骰娘（TypeScript）。
 
+**授权：AGPL-3.0-or-later**（见 `LICENSE`）——本仓库是 [Dice!](https://github.com/Dice-Developer-Team/Dice)（QQ 骰娘，AGPL-3.0-or-later，作者 w4123溯洄 / String.Empty）的 **Discord 移植**：行格式、房规判定、词库与日志格式都对齐其实现，开发期参考的源码放在工作区的 `ref/Dice`（**不随本仓库发布**）。按 AGPL §13，把本 bot 作为网络服务提供给他人时，需要让使用者能获得对应源码——本仓库即是源码。
+
 规格不是"参考"，而是**构建输入**：`docs/discord-commands.json`（19 条命令的注册负载）被原样打进
 `src/bot/spec/discord-commands.json`，由 `src/bot/manifest.ts` 载入并注册；`scripts/check-manifest.ts`
 与 `tests/spec/manifest.test.ts` 保证代码与文档**永不漂移**。
@@ -195,4 +197,16 @@ npm run check                    # 上面三件事一起跑
 
 1. **暗骰成员只拉 KP**：本局 KP 由 `/game start keeper:` 指定，有局时 `/rh` 只把本局 KP 拉进私密子区，发起者本人（PL）不进子区，改为在**仅自己可见**的回执里看到骰值；`/rh keeper:` 只在无局时生效，有局时给了会在回执里说明被忽略（KP 不由 `/rh` 改）。
 2. **暗骰子区按场景独立**：自动暗骰子区改为按**场景**缓存、命名 `暗骰 · <场景名>`，不同子区各开一个、互不串投（原先按父频道缓存，兄弟子区会共用同一个）。
+
+---
+
+## 授权（License）
+
+本项目以 **GNU Affero General Public License v3.0 or later（AGPL-3.0-or-later）** 发布，全文见 [`LICENSE`](LICENSE)。
+
+- **来源与署名**：这是 QQ 骰娘 [Dice!](https://github.com/Dice-Developer-Team/Dice)（AGPL-3.0-or-later，作者 **w4123溯洄 / String.Empty**）的 Discord 移植版。掷骰/检定语义、房规 0-6、日志行格式与文件名约定、词库抽取等都对齐上游实现；开发期参考的上游源码位于工作区 `ref/Dice`，**不在本仓库内**、也不随发布包分发。
+- **你可以**：自由使用、修改、再分发，包括商用；条件是修改后的源码同样以 AGPL 提供，并保留版权与许可声明。
+- **网络服务条款（§13）**：如果你把这个 bot 挂在服务器上给别人用（Discord 机器人正是这种形态），使用者有权拿到对应版本的源码。最省事的做法就是直接公开你的 fork（本仓库即源码）。
+- **注意**：`ref/` 下的上游代码是 AGPL，本仓库不含其代码；若你把上游代码并入本项目，请保持 AGPL 并保留其版权头。
+- 想让本仓库用别的协议（例如 MIT）**不可以**照搬上游实现细节与词库数据后再闭源——如需宽松许可，请先确认哪部分是可独立授权的原创代码。
 3. **日志按场景隔离**：`/log` 的作用域是"开 log 的那个场景"，`/game switch` 不再搬走日志；不同频道/子区可同时各开一条；子区消息在子区没有生效日志时回落到父频道。
