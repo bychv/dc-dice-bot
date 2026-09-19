@@ -274,8 +274,17 @@ describe('/game switch', () => {
     );
     assert.equal(env.store.getSceneGame(scene1), '#2');
     await route(sceneCtx(scene1), env.deps);
-    assert.equal(env.coc.checkCalls.at(-1)?.sheet, null);
+    // #2 里这个玩家没有单独绑卡 → 回落到**用户级常用卡**（绑定跟着用户走，不再变成"无卡"）
+    assert.equal(env.coc.checkCalls.at(-1)?.sheet?.name, '卡特');
     assert.equal(env.coc.checkCalls.at(-1)?.rule, 0);
+
+    // 给 #2 单独 tag 另一张卡：局绑定优先于用户级常用卡
+    await route(makeContext({ command: 'pc', sub: 'new', channelId: scene2, parentChannelId: 'C1', userId: 'U1', values: { name: '奈亚卡' } }, env.platform), env.deps);
+    await route(makeContext({ command: 'pc', sub: 'tag', channelId: scene2, parentChannelId: 'C1', userId: 'U1', values: { name: '奈亚卡' } }, env.platform), env.deps);
+    assert.equal(env.store.getBinding('game', '#2', 'U1'), '奈亚卡');
+    assert.equal(env.store.getBinding('user', 'G1', 'U1'), '奈亚卡', '常用卡跟随最近一次 tag');
+    await route(sceneCtx(scene2), env.deps);
+    assert.equal(env.coc.checkCalls.at(-1)?.sheet?.name, '奈亚卡');
 
     // 日志按场景隔离：切局不会把日志换走，本场景自己的日志继续记录
     const list2 = await route(makeContext({ command: 'log', sub: 'list', channelId: scene1, parentChannelId: 'C1', userId: 'U1' }, env.platform), env.deps);
@@ -287,7 +296,7 @@ describe('/game switch', () => {
       env.deps,
     );
     await route(sceneCtx(scene1), env.deps);
-    assert.equal(env.coc.checkCalls.at(-1)?.sheet?.name, '卡特');
+    assert.equal(env.coc.checkCalls.at(-1)?.sheet?.name, '卡特', '切回 #1 → 用 #1 自己的局绑定');
     assert.equal(env.coc.checkCalls.at(-1)?.rule, 3);
     assert.equal(env.store.getSceneGame(scene2), '#2');
   });

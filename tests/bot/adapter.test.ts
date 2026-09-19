@@ -137,7 +137,7 @@ describe('createLogRecorder', () => {
       makeContext({ command: 'game', sub: 'start', channelId: 'C1', channelName: '跑团', userId: 'KP1', values: { name: '阿卡姆', keeper: 'KP1', here: true } }, env.platform),
       env.deps,
     );
-    const log = env.store.listLogs({ gameId: '#1', channelId: 'C1' })[0];
+    const log = env.store.listSceneLogs('C1', 'G1')[0]!;
     const record = createLogRecorder(env.store);
 
     record(fakeMessage(env));
@@ -166,7 +166,7 @@ describe('createLogRecorder', () => {
       makeContext({ command: 'log', sub: 'new', channelId: 'C1', userId: 'U1', values: { name: '第一夜' } }, env.platform),
       env.deps,
     );
-    const log = env.store.listLogs({ gameId: '#1', channelId: 'C1' })[0];
+    const log = env.store.listSceneLogs('C1', 'G1')[0]!;
     const record = createLogRecorder(env.store);
     record(fakeMessage(env, { content: '', attachments: 2 }));
     assert.equal(env.store.logLines(log.id).length, 1);
@@ -179,7 +179,7 @@ describe('createLogRecorder', () => {
       makeContext({ command: 'log', sub: 'new', channelId: 'C1', userId: 'U1', values: { name: '第一夜' } }, env.platform),
       env.deps,
     );
-    const log = env.store.listLogs({ gameId: '#1', channelId: 'C1' })[0];
+    const log = env.store.listSceneLogs('C1', 'G1')[0]!;
     await route(makeContext({ command: 'log', sub: 'off', channelId: 'C1', userId: 'U1' }, env.platform), env.deps);
     createLogRecorder(env.store)(fakeMessage(env));
     assert.deepEqual(env.store.logLines(log.id), []);

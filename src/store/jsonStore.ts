@@ -31,6 +31,8 @@ type BindingMap = Record<string, Record<string, string>>;
 type BindingsDb = {
   game: BindingMap;
   scene: BindingMap;
+  /** 用户级：键是 guildId（`@dm` 兜底），值是"这个用户在本服的常用卡" */
+  user: BindingMap;
   global: BindingMap;
 };
 type GamesDb = Record<string, Record<string, GameRecord>>;
@@ -114,6 +116,7 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
     this.bindings = readJson<BindingsDb>(join(this.dir, FILES.bindings), {
       game: {},
       scene: {},
+      user: {},
       global: {},
     });
     this.games = readJson<GamesDb>(join(this.dir, FILES.games), {});
@@ -124,7 +127,11 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
     this.misc = readJson<MiscDb>(join(this.dir, FILES.misc), { nicks: {}, ruleSets: {} });
 
     // normalise a partially written / hand-edited file
-    if (!this.bindings.game) this.bindings = { game: {}, scene: {}, global: {} };
+    if (!this.bindings.game) this.bindings = { game: {}, scene: {}, user: {}, global: {} };
+    // 老版本没有 user 作用域（用户级常用卡），补一个空表以免读写崩
+    if (!this.bindings.scene) this.bindings.scene = {};
+    if (!this.bindings.user) this.bindings.user = {};
+    if (!this.bindings.global) this.bindings.global = {};
     if (!this.rules.game) this.rules = { game: {}, scene: {} };
     if (!this.logs.logs) this.logs = { logs: {}, lines: {}, nextId: 0 };
     if (!this.logs.lines) this.logs.lines = {};
@@ -266,7 +273,7 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
   }
 
   clearBindingsFor(key: string): void {
-    for (const scope of ['game', 'scene', 'global'] as const) {
+    for (const scope of ['game', 'scene', 'user', 'global'] as const) {
       delete this.bindings[scope][key];
     }
     this.markDirty('bindings');

@@ -1,8 +1,8 @@
 /**
  * `/pc` — 多角色卡管理 (docs §5.1).
  *
- * `tag` writes to the **session** when the scene belongs to one (局内所有场景共享、切局自动跟随),
- * otherwise to the scene, and in DM to the global default. Reads walk 局 > 场景 > 全局.
+ * `tag` 写**主作用域**（有局写本局，否则写本场景，DM 写全局默认）**外加用户级常用卡**，
+ * 于是绑定跟着用户走、跨子区/跨频道持续；解析顺序：局 > 当前场景 > 父频道 > 用户级 > 全局。
  */
 import type { CommandHandler, HandlerDeps, InteractionContext, ReplyPayload } from '../../contracts/bot.ts';
 import type { CharacterSheet } from '../../contracts/model.ts';
@@ -11,9 +11,11 @@ import { askConfirm } from '../confirm.ts';
 import {
   GLOBAL_BINDING_KEY,
   bindingCandidates,
+  bindingWriteTargets,
   currentGame,
   resolveSheet,
   sheetBindingScope,
+  type BindingTarget,
 } from './context.ts';
 import { fmtDateTime, mentionChannel } from './format.ts';
 import { randomName } from './names.ts';
@@ -26,20 +28,31 @@ import {
   uniqueSheetName,
 } from './sheets.ts';
 
+/**
+ * 写入角色卡绑定。`/pc tag` 会同时写**主作用域**（本局 / 本场景 / 全局）与**用户级**常用卡，
+ * 于是绑定"跟着用户走"：没单独设过的频道与子区都能直接用。
+ */
 function bindSheet(
   ctx: InteractionContext,
   deps: HandlerDeps,
   name: string | null,
-): { label: string; shared: boolean } {
-  const target = sheetBindingScope(ctx, deps);
-  deps.store.setBinding(target.scope, target.key, ctx.userId, name);
+): { label: string; shared: boolean; persistent: boolean } {
+  const targets = bindingWriteTargets(ctx, deps);
+  for (const target of targets) {
+    deps.store.setBinding(target.scope, target.key, ctx.userId, name);
+  }
+  const primary = targets[0] as BindingTarget;
   const label =
-    target.scope === 'game'
-      ? `本局 ${target.key}`
-      : target.scope === 'scene'
-        ? `场景 ${mentionChannel(target.key)}`
+    primary.scope === 'game'
+      ? `本局 ${primary.key}`
+      : primary.scope === 'scene'
+        ? `场景 ${mentionChannel(primary.key)}`
         : '全局默认（DM）';
-  return { label, shared: target.scope === 'game' };
+  return {
+    label,
+    shared: primary.scope === 'game',
+    persistent: targets.some((target) => target.scope === 'user'),
+  };
 }
 
 /** Clear every binding of this user that points at `name` (only the keys we can enumerate). */
@@ -87,9 +100,13 @@ async function pcNew(ctx: InteractionContext, deps: HandlerDeps): Promise<ReplyP
   deps.store.putSheet(ctx.userId, sheet);
 
   // 之前没有任何生效卡时顺手绑定当前作用域，之后可随时 /pc tag 改
-  if (!resolveSheet(ctx, deps)) {
+  const active = resolveSheet(ctx, deps);
+  if (!active) {
     const { label, shared } = bindSheet(ctx, deps, sheet.name);
     lines.push(`已自动绑定到${label}${shared ? '（局内所有场景共享）' : ''}。`);
+  } else if (active.name !== sheet.name) {
+    // 已经有生效卡（可能是用户级常用卡）时不自动抢绑定，只说清怎么切
+    lines.push(`当前生效的仍是「${active.name}」；要切到这张新卡用 \`/pc tag name:${sheet.name}\`。`);
   }
   return ok(clamp(lines.join('\n')));
 }
@@ -102,7 +119,7 @@ async function pcTag(ctx: InteractionContext, deps: HandlerDeps): Promise<ReplyP
     const { label } = bindSheet(ctx, deps, null);
     const fallback = resolveSheet(ctx, deps);
     return ok(
-      `已解绑${label}的角色卡绑定，回落到${
+      `已解绑${label}的角色卡绑定${ctx.guildId ? '（含本服常用卡）' : ''}，回落到${
         fallback ? `「${fallback.name}」` : '无（可用 /pc tag name:卡名 绑定，或 /pc new 新建）'
       }。`,
     );
@@ -112,8 +129,11 @@ async function pcTag(ctx: InteractionContext, deps: HandlerDeps): Promise<ReplyP
   if (!sheet) {
     return fail(`没有名为「${name}」的角色卡。用 \`/pc list\` 查看，或 \`/pc new name:${name}\` 新建。`);
   }
-  const { label, shared } = bindSheet(ctx, deps, sheet.name);
+  const { label, shared, persistent } = bindSheet(ctx, deps, sheet.name);
   const lines = [`已把角色卡「${sheet.name}」绑定到${label}${shared ? '（局内所有场景共享，切局自动跟随）' : ''}。`];
+  if (persistent) {
+    lines.push('同时记为本服**常用卡**：其他没有单独绑定的频道/子区会自动用它（换绑定就跟着换）。');
+  }
   if (game) lines.push(`切换局（/game switch）时角色卡会自动跟着换，不需要重新 tag。`);
   return ok(lines.join('\n'));
 }

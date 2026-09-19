@@ -148,6 +148,8 @@ describe('跨子区继承上级场景（频道）', () => {
 
     await startGame(env, { channelId: 'T2', parentChannelId: 'C1' }, '奈亚', 'T2');
     await route(ctx(env, { command: 'pc', sub: 'new', channelId: 'T2', parentChannelId: 'C1', values: { name: '乙卡' } }), env.deps);
+    // 此时"甲卡"已经通过**用户级常用卡**生效，所以新建的卡要显式 tag 才算当前卡
+    await route(ctx(env, { command: 'pc', sub: 'tag', channelId: 'T2', parentChannelId: 'C1', values: { name: '乙卡' } }), env.deps);
     await route(ctx(env, { command: 'st', channelId: 'T2', parentChannelId: 'C1', values: { text: '闪避:70' } }), env.deps);
 
     const first = await route(ctx(env, { command: 'rc', channelId: 'T1', parentChannelId: 'C1', values: { text: '闪避' } }), env.deps);

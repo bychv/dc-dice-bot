@@ -51,6 +51,7 @@ export class MemoryStore implements BotStore, NickStore, RuleSetStore, LogLineRe
   bindings: Record<BindingScope, Map<string, Map<string, string>>> = {
     game: new Map(),
     scene: new Map(),
+    user: new Map(),
     global: new Map(),
   };
   games = new Map<string, Map<string, GameRecord>>();
@@ -110,7 +111,7 @@ export class MemoryStore implements BotStore, NickStore, RuleSetStore, LogLineRe
   }
 
   clearBindingsFor(key: string): void {
-    for (const scope of ['game', 'scene', 'global'] as const) this.bindings[scope].delete(key);
+    for (const scope of ['game', 'scene', 'user', 'global'] as const) this.bindings[scope].delete(key);
   }
 
   listGames(guildId: string): GameRecord[] {

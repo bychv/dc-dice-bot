@@ -87,15 +87,22 @@ describe('/pc tag scope', () => {
     assert.ok(show.content.includes('【卡特】'));
   });
 
-  test('without a session the binding is on the scene only', async () => {
+  test('without a session the binding covers the scene AND the user-level 常用卡（跨频道/子区持续）', async () => {
     const env = makeEnv();
     await route(pcCtx(env, 'new', { name: '卡特' }, { channelId: 'C5' }), env.deps);
     await route(pcCtx(env, 'tag', { name: '卡特' }, { channelId: 'C5' }), env.deps);
     assert.equal(env.store.getBinding('scene', 'C5', 'U1'), '卡特');
+    assert.equal(env.store.getBinding('user', 'G1', 'U1'), '卡特', '同时记为本服常用卡');
 
+    // 别的频道没有单独绑定 → 用用户级常用卡（这就是"跨子区持续"）
     const other = await route(pcCtx(env, 'show', {}, { channelId: 'C6' }), env.deps);
-    assert.equal(other.ephemeral, true);
-    assert.ok(other.content.includes('没有生效的角色卡'));
+    assert.notEqual(other.ephemeral, true);
+    assert.ok(other.content.includes('卡特'), other.content);
+
+    // 但不会跨服务器串卡
+    const otherGuild = await route(pcCtx(env, 'show', {}, { channelId: 'C6', guildId: 'G2' }), env.deps);
+    assert.equal(otherGuild.ephemeral, true);
+    assert.ok(otherGuild.content.includes('没有生效的角色卡'), otherGuild.content);
   });
 
   test('resolution order is 局 > 场景 > 全局默认卡, and omitting name unbinds one level', async () => {

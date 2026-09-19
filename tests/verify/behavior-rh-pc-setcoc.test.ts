@@ -202,7 +202,7 @@ describe('T4 · /pc tag 绑定解析链（局 > 场景 > 全局）', () => {
     return env.coc.checkCalls.at(-1)?.sheet?.name;
   }
 
-  test('三张卡绑定到全局 / 场景 / 局，读取顺序为 局 > 场景 > 全局', async () => {
+  test('三张卡绑定到全局 / 场景 / 局，读取顺序为 局 > 场景 > 用户级 > 全局', async () => {
     const env = makeEnv();
     // 1) DM → 全局默认卡
     await pcNew(env, '全局卡', { guildId: null, channelId: 'D1' });
@@ -229,15 +229,19 @@ describe('T4 · /pc tag 绑定解析链（局 > 场景 > 全局）', () => {
     await route(makeContext({ command: 'rc', channelId: 'C2', userId: 'U1', values: { text: '力量' } }, env.platform), env.deps);
     assert.equal(readSheet(env, {}), '场景卡');
 
-    // 新场景 C3（无局无场景绑定）→ 全局卡
+    // 新场景 C3（无局、无场景绑定）→ **用户级常用卡**（最近一次 tag 的「局卡」，跨子区/跨频道持续）
     await route(makeContext({ command: 'rc', channelId: 'C3', userId: 'U1', values: { text: '力量' } }, env.platform), env.deps);
-    assert.equal(readSheet(env, {}), '全局卡');
+    assert.equal(readSheet(env, {}), '局卡', '用户级常用卡 = 最近一次 tag 的卡');
+    assert.equal(env.store.getBinding('user', 'G1', 'U1'), '局卡');
 
-    // 解绑局卡后局内回落到场景（无）→ 全局
+    // 解绑局卡：局绑定与用户级常用卡一起清掉 → 回落到全局默认卡
     await pcTag(env, undefined, { channelId: t1, parentChannelId: 'C1' });
     assert.equal(env.store.getBinding('game', '#1', 'U1'), null);
+    assert.equal(env.store.getBinding('user', 'G1', 'U1'), null, '解绑同时清掉常用卡');
     await route(makeContext({ command: 'rc', channelId: t1, parentChannelId: 'C1', userId: 'U1', values: { text: '力量' } }, env.platform), env.deps);
     assert.equal(readSheet(env, {}), '全局卡');
+    await route(makeContext({ command: 'rc', channelId: 'C3', userId: 'U1', values: { text: '力量' } }, env.platform), env.deps);
+    assert.equal(readSheet(env, {}), '全局卡', '常用卡清掉后，新场景也回到全局默认卡');
   });
 
   test('DM 里 tag 写全局绑定；/pc del 同时清绑定', async () => {

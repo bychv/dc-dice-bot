@@ -77,9 +77,10 @@ export interface SceneKey {
 }
 
 /**
- * 局 > 场景 > 全局 default card (docs §10.2)。
- * 场景这一层按「当前场景 → 父频道」两级查：子区里没单独绑卡时继承父频道的绑定，
- * 这样在频道里 tag 的卡进子区照样能用（写入口径不变，仍是当前场景，见 `sheetBindingScope`）。
+ * 解析顺序（左优先）：**局 → 当前场景 → 父频道 → 用户级（本服常用卡） → 全局默认卡**。
+ *   - 场景这层按「当前场景 → 父频道」两级查：子区里没单独绑卡时继承父频道的绑定；
+ *   - **用户级**是"持久绑定到用户"的那一层：key = guildId，整个服务器通用，因此**跨子区/跨频道**都生效，
+ *     只要该场景/该局没有更具体的绑定；DM 里不查这一层（DM 直接用全局默认卡）。
  */
 export function bindingCandidatesFor(store: BotStore, key: SceneKey): BindingTarget[] {
   const targets: BindingTarget[] = [];
@@ -95,6 +96,7 @@ export function bindingCandidatesFor(store: BotStore, key: SceneKey): BindingTar
     if (key.parentChannelId && key.parentChannelId !== key.channelId) {
       targets.push({ scope: 'scene', key: key.parentChannelId });
     }
+    targets.push({ scope: 'user', key: key.guildId });
   }
   targets.push({ scope: 'global', key: GLOBAL_BINDING_KEY });
   return targets;
@@ -125,12 +127,35 @@ export function resolveNickFor(store: BotStore, key: SceneKey): string | null {
   );
 }
 
-/** Where `/pc tag` writes: the session when there is one, otherwise the scene / global default. */
-export function sheetBindingScope(ctx: InteractionContext, deps: HandlerDeps): BindingTarget {
+/**
+ * `/pc tag` 的写入目标（可以多个）：
+ *   - 有局 → 本局 + **用户级**（本服常用卡）：局内所有场景共享，且没局的频道/子区也默认用它；
+ *   - 无局但在服务器 → 当前场景 + **用户级**：本场景立即生效，其他场景/子区持续沿用；
+ *   - DM → 全局默认卡（保持"所有群共用一张初始卡"的语义）。
+ *
+ * 用户级 key 用 `guildId`（用户维度由 store 的 `userId` 参数承担），所以**跨子区、跨频道**都成立，
+ * 但不会跨服务器串卡。
+ */
+export function bindingWriteTargets(ctx: InteractionContext, deps: HandlerDeps): BindingTarget[] {
   const game = currentGame(ctx, deps);
-  if (game) return { scope: 'game', key: game.id };
-  if (ctx.guildId) return { scope: 'scene', key: ctx.channelId };
-  return { scope: 'global', key: GLOBAL_BINDING_KEY };
+  if (game && ctx.guildId) {
+    return [
+      { scope: 'game', key: game.id },
+      { scope: 'user', key: ctx.guildId },
+    ];
+  }
+  if (ctx.guildId) {
+    return [
+      { scope: 'scene', key: ctx.channelId },
+      { scope: 'user', key: ctx.guildId },
+    ];
+  }
+  return [{ scope: 'global', key: GLOBAL_BINDING_KEY }];
+}
+
+/** 兼容旧调用：写入目标里的**主作用域**（第一个）。 */
+export function sheetBindingScope(ctx: InteractionContext, deps: HandlerDeps): BindingTarget {
+  return bindingWriteTargets(ctx, deps)[0] as BindingTarget;
 }
 
 export function resolveSheet(ctx: InteractionContext, deps: HandlerDeps): CharacterSheet | null {
@@ -141,6 +166,8 @@ export function resolveSheet(ctx: InteractionContext, deps: HandlerDeps): Charac
  * `/st` and friends need a card even when the player never tagged one. The manual promises a
  * default COC7 card per user, so: adopt the single unbound card when exactly one exists, create
  * a default card when none exists, and stay ambiguous (null → caller explains) when several do.
+ *
+ * 认领时按 `bindingWriteTargets` **写入全部目标**（含用户级），这样认领过的卡同样跨子区持续可用。
  */
 export function adoptSheet(
   ctx: InteractionContext,
@@ -150,16 +177,20 @@ export function adoptSheet(
   if (active) return { sheet: active, created: false, adopted: false };
 
   const owned = deps.store.listSheets(ctx.userId);
-  const target = sheetBindingScope(ctx, deps);
+  const targets = bindingWriteTargets(ctx, deps);
   if (owned.length === 1) {
-    deps.store.setBinding(target.scope, target.key, ctx.userId, owned[0].name);
+    for (const target of targets) {
+      deps.store.setBinding(target.scope, target.key, ctx.userId, owned[0].name);
+    }
     return { sheet: owned[0], created: false, adopted: true };
   }
   if (owned.length === 0) {
     const base = ctx.displayName && ctx.displayName.trim().length > 0 ? ctx.displayName.trim() : '默认卡';
     const sheet = createSheet(uniqueSheetName(deps.store, ctx.userId, base), 'COC7', deps.now());
     deps.store.putSheet(ctx.userId, sheet);
-    deps.store.setBinding(target.scope, target.key, ctx.userId, sheet.name);
+    for (const target of targets) {
+      deps.store.setBinding(target.scope, target.key, ctx.userId, sheet.name);
+    }
     return { sheet, created: true, adopted: true };
   }
   return null;

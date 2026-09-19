@@ -7,13 +7,14 @@
  * - a log's scope is the scene it was opened in: it never follows `/game switch`;
  * - paused (`off`) logs are never touched automatically — `/log new` opens a new stream and the
  *   old one stays paused until `/log end name:<旧名>`;
- * - `/log new` with no session is the reverse entry point of `/game start here:true`.
+ * - **不再自动开局**：`/log new` 在当前场景没有局时只开**场景日志**（gameId = null）；
+ *   要挂到局上必须显式 `/game start` 或 `/log new game:<桌名|#N>`。
  */
 import type { CommandHandler, HandlerDeps, InteractionContext, ReplyPayload } from '../../contracts/bot.ts';
 import type { GameRecord, LogRecord } from '../../contracts/model.ts';
 import { activeLog, currentGame, findLogByName, scopedLogs } from './context.ts';
 import { fmtDateTime, fmtLogLine, fmtStamp, mentionChannel } from './format.ts';
-import { createLog, exportLogRecord, pauseAbandonedLogs, startGame } from './gameCore.ts';
+import { createLog, exportLogRecord, pauseAbandonedLogs } from './gameCore.ts';
 import { clamp, fail, ok, optionString, subcommand } from './options.ts';
 
 function refusal(recording: LogRecord): ReplyPayload {
@@ -49,20 +50,12 @@ async function logNew(ctx: InteractionContext, deps: HandlerDeps): Promise<Reply
   const recording = sceneLogs.find((l) => l.state === 'on');
   if (recording) return refusal(recording);
 
-  // 反向入口：无局、无日志 → 自动建局（等价 /game start name:<日志名> here:true）
-  if (!game && ctx.guildId && sceneLogs.length === 0) {
-    const created = await startGame(ctx, deps, {
-      name: logName,
-      keeperId: ctx.userId,
-      here: true,
-      openLog: false,
-      logName,
-    });
-    game = created.game;
+  // 不再自动开局：没有局时就是**场景日志**（gameId = null）。
+  // 要挂到局上必须显式：先 `/game start`，或 `/log new game:<桌名|#N>`。
+  if (!game && ctx.guildId) {
     notes.push(
-      `当前场景没有局，已自动开局 ${created.game.id} ${created.game.name}（就地绑定当前场景，KP 为发起者）。`,
+      '当前场景没有所属局，已开为**场景日志**（只记录本场景；不建局）。要开团/挂到局上请用 `/game start`，或 `/log new game:<桌名|#N>`。',
     );
-    notes.push(...created.notes.map((note) => `注意：${note}`));
   }
 
   // 指定 game: 时同时把本场景切到该局 (docs §11.1)

@@ -23,8 +23,11 @@ export interface CharacterSheet {
   updatedAt: string;
 }
 
-/** Binding scope: 局 > 场景 > 全局 (docs §10.2). */
-export type BindingScope = 'game' | 'scene' | 'global';
+/**
+ * Binding scope: 局 > 当前场景 > 父频道 > **用户（本服常用卡）** > 全局 (docs §10.2)。
+ * `user` 是"持久绑定到用户"的那一层：`/pc tag` 会把它记在服务器级，没写 tag 的频道/子区都默认用它。
+ */
+export type BindingScope = 'game' | 'scene' | 'user' | 'global';
 
 export type GameStatus = 'active' | 'ended';
 

@@ -81,28 +81,22 @@ describe('/log new', () => {
     assert.ok(list.content.includes('← 当前生效'));
   });
 
-  test('with no session at all it creates one in place (等价 /game start here:true, 桌名取日志名)', async () => {
+  test('with no session it opens a 场景日志 and does NOT create a game (需显式 /game start)', async () => {
     const env = makeEnv();
     const reply = await route(logCtx(env, 'new', { name: '第一夜' }), env.deps);
 
     assert.notEqual(reply.ephemeral, true);
-    assert.ok(reply.content.includes('自动开局'));
-    const games = env.store.listGames('G1');
-    assert.equal(games.length, 1);
-    const game = games[0];
-    assert.equal(game.name, '第一夜');
-    assert.equal(game.keeperId, 'KP1');
-    assert.equal(game.sceneThreadId, null, 'here:true must not create a scene thread');
-    assert.equal(env.store.getSceneGame('C1'), game.id);
-    assert.ok(game.hiddenThreadId);
-    assert.equal(env.platform.threads.get(game.hiddenThreadId)?.name, '暗骰 · 第一夜');
-    assert.equal(env.platform.threads.get(game.hiddenThreadId)?.private, true);
+    assert.ok(reply.content.includes('场景日志'), reply.content);
+    assert.ok(reply.content.includes('/game start'), `要提示怎么开局：${reply.content}`);
+    assert.deepEqual(env.store.listGames('G1'), [], '默认不再自动建局');
+    assert.equal(env.store.getSceneGame('C1'), null, '也不绑定局');
+    assert.equal([...env.platform.threads.values()].length, 0, '不建暗骰子区');
 
-    const logs = env.store.listLogs({ gameId: game.id, channelId: 'C1' });
+    const logs = env.store.listSceneLogs('C1', 'G1');
     assert.equal(logs.length, 1);
     assert.equal(logs[0].name, '第一夜');
     assert.equal(logs[0].state, 'on');
-    assert.equal(game.currentLogId, logs[0].id);
+    assert.equal(logs[0].gameId, null, '场景日志 gameId 为 null');
   });
 
   test('in DM no session is created; only a scene log', async () => {
@@ -141,16 +135,15 @@ describe('/log new', () => {
     assert.equal(refused.ephemeral, true);
   });
 
-  test('duplicate log names inside one session are auto-numbered', async () => {
+  test('duplicate log names inside one 场景 are auto-numbered', async () => {
     const env = makeEnv();
     await route(logCtx(env, 'new', { name: '第一夜' }), env.deps);
-    const game = env.store.listGames('G1')[0];
     const scene = 'C1';
 
     await route(makeContext({ command: 'log', sub: 'off', channelId: scene, userId: 'KP1' }, env.platform), env.deps);
     await route(makeContext({ command: 'log', sub: 'new', channelId: scene, userId: 'KP1', values: { name: '第一夜' } }, env.platform), env.deps);
 
-    const names = env.store.listLogs({ gameId: game.id, channelId: scene }).map((l) => l.name).sort();
+    const names = env.store.listSceneLogs(scene, 'G1').map((l) => l.name).sort();
     assert.deepEqual(names, ['第一夜', '第一夜 (2)'].sort());
   });
 });

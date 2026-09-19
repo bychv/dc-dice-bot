@@ -17,10 +17,6 @@ export interface StartGameInput {
   threadId?: string | null;
   /** use the current channel/thread in place */
   here?: boolean;
-  /** `false` skips the automatic `<桌名> · <MMDD-HHmm>` log (used by `/log new`) */
-  openLog?: boolean;
-  /** override for the automatic log name */
-  logName?: string | null;
 }
 
 export interface StartGameResult {
@@ -170,24 +166,19 @@ export async function startGame(
     pauseAbandonedLogs(deps, guildId, previous);
   }
 
-  let log: LogRecord | null = null;
-  if (input.openLog !== false) {
-    // 日志名：优先 `/log new name:` 传进来的设定名；没设定就回退**桌名**
-    // （桌名本身要么是设定的名字，要么是带完整日期的 `<频道名> · <YYYY-MM-DD HHMM>`）。
-    const base = input.logName && input.logName.trim().length > 0 ? input.logName.trim() : input.name;
-    log = createLog(deps, {
-      name: base,
-      gameId: game.id,
-      guildId,
-      channelId: sceneId,
-      // 日志按场景隔离：开局自动开的日志只记主场景（子区）的发言；
-      // 其他频道/子区各自 /log new，互不影响。
-      sceneIds: [sceneId],
-      state: 'on',
-    });
-    game.currentLogId = log.id;
-    deps.store.putGame(game);
-  }
+  // 开局自动开日志，日志名 = 桌名（设定名优先；桌名省略时是带完整日期的回退名）
+  const log: LogRecord = createLog(deps, {
+    name: input.name,
+    gameId: game.id,
+    guildId,
+    channelId: sceneId,
+    // 日志按场景隔离：开局自动开的日志只记主场景（子区）的发言；
+    // 其他频道/子区各自 /log new，互不影响。
+    sceneIds: [sceneId],
+    state: 'on',
+  });
+  game.currentLogId = log.id;
+  deps.store.putGame(game);
 
   return { game, log, sceneId, notes };
 }

@@ -171,7 +171,7 @@ describe('T4 · /game switch 与上下文跟随', () => {
     // 切到 #2
     await route(inT1({ command: 'game', sub: 'switch', values: { game: '#2' } }), env.deps);
     await route(inT1({ command: 'rc', values: { text: '力量' } }), env.deps);
-    assert.equal(env.coc.checkCalls.at(-1)?.sheet, null, '#2 没有角色卡绑定');
+    assert.equal(env.coc.checkCalls.at(-1)?.sheet?.name, '卡特', '#2 没有局绑定 → 用用户级常用卡');
     assert.equal(env.coc.checkCalls.at(-1)?.rule, 0, '#2 房规回落默认');
 
     const rh = await route(inT1({ command: 'rh', values: { text: '心理学' } }), env.deps);
@@ -342,23 +342,21 @@ describe('T4 · /log 生命周期', () => {
     assert.equal(env.store.listLogs({ gameId: '#1', channelId: t1, guildId: 'G1' }).length, 3);
   });
 
-  test('无局无日志：/log new 自动建局（就地绑定、KP=发起者、建暗骰子区）', async () => {
+  test('无局无日志：/log new 只开场景日志，不自动建局（要开局须显式 /game start）', async () => {
     const env = makeEnv();
     const reply = await route(ctx(env, { command: 'log', sub: 'new', channelId: 'C1', channelName: '跑团', userId: 'U1', values: { name: '第一夜' } }), env.deps);
 
     assert.notEqual(reply.ephemeral, true);
-    const games = env.store.listGames('G1');
-    assert.equal(games.length, 1);
-    assert.equal(games[0].id, '#1');
-    assert.equal(games[0].name, '第一夜');
-    assert.equal(games[0].keeperId, 'U1');
-    assert.equal(games[0].sceneThreadId, null, 'here:true → 不新建子区');
-    assert.equal(env.store.getSceneGame('C1'), '#1');
-    assert.ok(games[0].hiddenThreadId, '自动建局也要建暗骰子区');
-    const log = env.store.listLogs({ gameId: '#1', channelId: 'C1', guildId: 'G1' })[0];
+    assert.deepEqual(env.store.listGames('G1'), [], '默认不再自动建局');
+    assert.equal(env.store.getSceneGame('C1'), null, '不得把场景绑到局上');
+    assert.equal([...env.platform.threads.values()].length, 0, '不建暗骰子区');
+
+    const log = env.store.listSceneLogs('C1', 'G1')[0]!;
     assert.equal(log.name, '第一夜');
     assert.equal(log.state, 'on');
-    assert.ok(reply.content.includes('自动开局'));
+    assert.equal(log.gameId, null, '场景日志 gameId 为 null');
+    assert.ok(reply.content.includes('场景日志'), reply.content);
+    assert.ok(reply.content.includes('/game start'), `要提示显式开局：${reply.content}`);
   });
 
   test('已有局：/log new 只加日志不建新局', async () => {
