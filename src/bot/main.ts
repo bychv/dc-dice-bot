@@ -103,11 +103,13 @@ if (r2.kind === 'invalid') {
   );
 }
 
+// 所有随机路径共用同一个 Rng 实例（含 /st 里的 `hp-1D6` 这类骰式，见 createCocRules 的第二个参数）
+const rng = createMathRng();
 const deps: HandlerDeps = {
   store,
   dice,
-  coc: createCocRules(dice),
-  rng: createMathRng(),
+  coc: createCocRules(dice, rng),
+  rng,
   platform: createDiscordPlatform(client),
   confirmations: createPendingActions(),
   now: () => new Date(),

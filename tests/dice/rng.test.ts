@@ -33,4 +33,11 @@ describe('createMathRng', () => {
       assert.ok(value >= 1 && value <= 6, `out of range: ${value}`);
     }
   });
+
+  test('非有限数范围直接报错（不再静默返回区间外的 0）', () => {
+    const rng = createMathRng();
+    assert.throws(() => rng.int(1, Number.NaN), RangeError);
+    assert.throws(() => rng.int(Number.POSITIVE_INFINITY, 6), RangeError);
+    assert.throws(() => rng.int(Number.NEGATIVE_INFINITY, 6), RangeError);
+  });
 });

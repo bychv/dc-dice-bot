@@ -15,13 +15,20 @@ import { resolveRollExpression } from './resolve.ts';
 import { runSanity } from './sanity.ts';
 import { runApplySt } from './st.ts';
 
-export function createCocRules(dice: DiceEngine): CocRules {
-  const rng: Rng = {
+/**
+ * 组装 CoC 规则引擎。
+ *
+ * `rng` 会用于 **`/st` 里的骰式**（如 `hp-1D6`、`san+1D6`）——`applySt` 的契约没有 rng 参数，
+ * 所以必须从工厂注入；`main.ts` 传的是 `HandlerDeps.rng`，保证"所有随机路径共用同一个 Rng"。
+ * 不传时退回 `Math.random`（只为兼容旧调用方，测试应显式注入）。
+ */
+export function createCocRules(dice: DiceEngine, rng?: Rng): CocRules {
+  const source: Rng = rng ?? {
     int: (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1)),
   };
   return {
     applySt(text: string, sheet: CharacterSheet | null): StResult {
-      return runApplySt(dice, text, sheet, new Date().toISOString(), rng);
+      return runApplySt(dice, text, sheet, new Date().toISOString(), source);
     },
     check(text: string, opts: CheckOptions): CheckResult {
       return runCheck(dice, text, opts);
