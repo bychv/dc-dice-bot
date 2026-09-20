@@ -12,7 +12,7 @@ import type { CommandHandler, HandlerDeps, InteractionContext, ReplyPayload } fr
 import { currentGame } from './context.ts';
 import { mentionChannel, mentionUser } from './format.ts';
 import { clamp, fail, optionBoolean, optionChannel, optionString, optionUser } from './options.ts';
-import { performRoll } from './roll.ts';
+import { performRoll, withActor } from './roll.ts';
 
 function degraded(reason: string, body: string, extra?: string): ReplyPayload {
   return {
@@ -138,7 +138,7 @@ export const rhHandler: CommandHandler = async (ctx, deps) => {
 
   const outcome = performRoll(ctx, deps, text, { compact: false });
   if (!outcome.ok) return fail(`掷骰失败：${outcome.error ?? '无法解析的骰式'}`);
-  const body = `【${ctx.displayName}】${outcome.lines.join('\n')}`;
+  const body = withActor(ctx, deps, outcome.lines.join('\n'));
 
   // 降级时骰值无处投递：明说 KP 看不到，免得玩家以为 KP 已知情
   const degradationNotes = game

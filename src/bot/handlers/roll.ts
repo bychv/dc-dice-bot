@@ -14,6 +14,7 @@
 import type { CommandHandler, HandlerDeps, InteractionContext } from '../../contracts/bot.ts';
 import { parseRollText, renderRoll } from '../../dice/index.ts';
 import { resolveNick, resolveSheet } from './context.ts';
+import { actorLabel } from './context.ts';
 import { clamp, fail, ok, optionString } from './options.ts';
 
 /** `1d4+2`, `3d6k2`, `3#1d6`, `b2`, `p` … — anything that looks like a dice expression. */
@@ -86,6 +87,14 @@ export function performRoll(
 export function withNick(ctx: InteractionContext, deps: HandlerDeps, content: string): string {
   const nick = resolveNick(ctx, deps);
   return nick ? `【${nick}】${content}` : content;
+}
+
+/**
+ * `【检定人】` 前缀（检定类回执用）：Discord 的斜杠命令不在频道里留玩家发言，日志只记骰娘回执，
+ * 所以回执自带"谁在检定"（角色卡名 → 称呼 → 显示名，与日志说话人同一套解析，见 `actorLabel`）。
+ */
+export function withActor(ctx: InteractionContext, deps: HandlerDeps, content: string): string {
+  return `【${actorLabel(ctx, deps)}】${content}`;
 }
 
 export const rHandler: CommandHandler = async (ctx, deps) => {

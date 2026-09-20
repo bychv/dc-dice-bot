@@ -166,6 +166,68 @@ describe('名字会随设定切换（已写入的行不变）', () => {
   });
 });
 
+describe('检定回执带「检定人」', () => {
+  test('/rc 回执以【角色卡名】开头；入日志后也能看出是谁在检定', async () => {
+    const env = makeEnv();
+    const logId = await openLogOnC1(env);
+    env.store.putSheet('U1', sheet('陈寻川'));
+    env.store.setBinding('scene', 'C1', 'U1', '陈寻川');
+
+    const reply = await route(
+      makeContext({ command: 'rc', channelId: 'C1', userId: 'U1', values: { text: '闪避' } }, env.platform),
+      env.deps,
+    );
+    assert.match(reply.content, /^【陈寻川】/, reply.content);
+
+    // 骰娘回执按原口径入日志（名字是骰娘），但**正文自带检定人**——Discord 的斜杠命令
+    // 不会在频道里留下玩家发言，没有这个前缀日志里就成了"无主检定"。
+    const interaction = {
+      commandName: 'rc',
+      channelId: 'C1',
+      deferred: false,
+      replied: false,
+      channel: { isThread: () => false },
+      guild: { members: { me: { nickname: '骰娘·阿卡姆' } } },
+      client: { user: { id: '9000', username: 'Dice!' } },
+      reply: async () => undefined,
+      editReply: async () => undefined,
+    } as unknown as ChatInputCommandInteraction;
+    await respond(interaction, reply, env.deps);
+
+    const line = env.store.logLines(logId).at(-1) ?? '';
+    assert.match(line, /^骰娘·阿卡姆\(9000\) /, line);
+    assert.match(line, /【陈寻川】/, line);
+    assert.match(line, /闪避/, line);
+  });
+
+  test('/sc 与 /en 同样带检定人；没卡时回退称呼/显示名', async () => {
+    const env = makeEnv();
+    await openLogOnC1(env);
+    env.store.putSheet('U1', sheet('陈寻川'));
+    env.store.setBinding('scene', 'C1', 'U1', '陈寻川');
+
+    const sc = await route(
+      makeContext({ command: 'sc', channelId: 'C1', userId: 'U1', values: { text: '0/1 60' } }, env.platform),
+      env.deps,
+    );
+    assert.match(sc.content, /^【陈寻川】/, sc.content);
+
+    const en = await route(
+      makeContext({ command: 'en', channelId: 'C1', userId: 'U1', values: { text: '闪避 50' } }, env.platform),
+      env.deps,
+    );
+    assert.match(en.content, /^【陈寻川】/, en.content);
+
+    // 没有角色卡也没有称呼 → 用 Discord 显示名
+    env.store.putSheet('U2', sheet('别人卡'));
+    const stranger = await route(
+      makeContext({ command: 'rc', channelId: 'C1', userId: 'U9', displayName: '路人甲', values: { text: '力量 50' } }, env.platform),
+      env.deps,
+    );
+    assert.match(stranger.content, /^【路人甲】/, stranger.content);
+  });
+});
+
 describe('骰娘那行的名字', () => {
   test('服务器昵称优先，没设回退用户名，都没有用 Dice', () => {
     assert.equal(botSpeakerName('骰娘·阿卡姆', 'Dice!'), '骰娘·阿卡姆');

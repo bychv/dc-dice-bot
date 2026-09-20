@@ -23,6 +23,7 @@ import {
   type RuleSetStore,
 } from '../../store/extras.ts';
 import { createSheet, uniqueSheetName } from './sheets.ts';
+import { speakerName } from '../logSpeaker.ts';
 
 /** 骰主默认房规（contract has no config slot for it; the analyser chose the rulebook rule, docs §8.1). */
 export const DEFAULT_HOUSE_RULE: HouseRule = 0;
@@ -160,6 +161,17 @@ export function sheetBindingScope(ctx: InteractionContext, deps: HandlerDeps): B
 
 export function resolveSheet(ctx: InteractionContext, deps: HandlerDeps): CharacterSheet | null {
   return resolveSheetFor(deps.store, ctx);
+}
+
+/**
+ * 检定类回执的「**谁在检定**」标签：与日志说话人**同一套解析**（角色卡名 → 称呼 `/nn` → Discord 显示名）。
+ *
+ * 为什么需要：Discord 的斜杠命令**不会在频道里留下玩家发言**，日志里只记骰娘回执，
+ * 于是 `/rc`、`/sc` 这类回执行在日志里变成"无主检定"（不知道是谁掷的）。
+ * 现在 `/rc` `/ra` `/sc` `/en`（以及 `/rh`）的回执自带 `【检定人】` 前缀，日志因此可追溯。
+ */
+export function actorLabel(ctx: InteractionContext, deps: HandlerDeps): string {
+  return speakerName(deps.store, ctx, ctx.displayName);
 }
 
 /**
