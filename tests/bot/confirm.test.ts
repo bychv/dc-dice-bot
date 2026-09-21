@@ -117,7 +117,7 @@ describe('adapter 按钮分支', () => {
 
     assert.equal(updates.length, 0);
     assert.equal(followUps.length, 1);
-    assert.equal(followUps[0].content, NOT_OWNER_MESSAGE);
+    assert.equal(followUps[0].content, `【<@U2>】${NOT_OWNER_MESSAGE}`, '按钮回执也带使用者前缀');
     assert.equal(followUps[0].flags, MessageFlags.Ephemeral);
     assert.equal(env.confirmations.size(), 1);
     assert.equal(env.store.listSheets('U1').length, 1);
@@ -137,7 +137,7 @@ describe('adapter 按钮分支', () => {
 
     assert.equal(followUps.length, 0);
     assert.equal(updates.length, 1);
-    assert.equal(updates[0].content, EXPIRED_MESSAGE);
+    assert.equal(updates[0].content, `【<@U1>】${EXPIRED_MESSAGE}`);
     assert.deepEqual(updates[0].components, []);
   });
 });

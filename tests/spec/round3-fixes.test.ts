@@ -99,7 +99,7 @@ describe('A) 按钮确认结果入日志', () => {
       assert.equal(updates.length, 1);
       const lines = asStoreWithLines(store).logLines('L1');
       assert.equal(lines.length, 1, `按钮结果应入日志，实际 ${JSON.stringify(lines)}`);
-      assert.match(lines[0] ?? '', /^Dice\(BOT1\) \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\n✅ 已销毁 1 张角色卡。\n\n$/);
+      assert.match(lines[0] ?? '', /^Dice\(BOT1\) \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\n【<@U1>】✅ 已销毁 1 张角色卡。\n\n$/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

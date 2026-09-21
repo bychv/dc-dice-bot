@@ -26,6 +26,7 @@ import type {
 } from '../contracts/bot.ts';
 import type { BotStore } from '../contracts/store.ts';
 import { handleButtonClick } from './confirm.ts';
+import { actorEcho } from './handlers/context.ts';
 import { appendBotReplyLine, appendUserLogLine } from './logFormat.ts';
 import { botSpeakerName, speakerName } from './logSpeaker.ts';
 import { route } from './router.ts';
@@ -395,7 +396,18 @@ export async function handleInteraction(
   hooks?.onContext?.(context);
   const payload = await route(context, deps);
   hooks?.onPayload?.(context, payload);
+  echoActorLabel(context, deps, payload);
   await respond(interaction, payload, deps);
+}
+
+/**
+ * 所有指令回执统一带 `【使用者】` 前缀（角色卡名 → 称呼 `/nn` → 显示名，与日志说话人同一套解析）。
+ *
+ * 目的：斜杠命令**不在频道里留下玩家发言**，日志里只有骰娘回执；带上使用者后，日志（以及频道里
+ * 的任何读者）都能看出"这条是谁发的"。幂等：已经以 `【` 开头的内容不再叠加。
+ */
+function echoActorLabel(ctx: InteractionContext, deps: HandlerDeps, payload: ReplyPayload): void {
+  payload.content = actorEcho(deps.store, ctx, ctx.displayName, payload.content);
 }
 
 /**
@@ -409,6 +421,23 @@ export async function handleButtonInteraction(
   deps: HandlerDeps,
 ): Promise<void> {
   const payload = await handleButtonClick(interaction.customId, interaction.user.id, deps);
+  // 按钮同样回显点击者（谁点的"确认执行"在日志里也要看得出来）
+  const parentId = interaction.channel?.isThread?.() ? (interaction.channel.parentId ?? null) : null;
+  const displayName =
+    interaction.member && 'displayName' in interaction.member
+      ? interaction.member.displayName
+      : (interaction.user.username ?? `<@${interaction.user.id}>`);
+  payload.content = actorEcho(
+    deps.store,
+    {
+      guildId: interaction.guildId ?? null,
+      channelId: interaction.channelId,
+      parentChannelId: parentId,
+      userId: interaction.user.id,
+    },
+    displayName,
+    payload.content,
+  );
   if (payload.ephemeral) {
     await interaction.followUp({ content: payload.content, flags: MessageFlags.Ephemeral });
     return;

@@ -7,7 +7,6 @@
 import type { CommandHandler, InteractionContext, ReplyPayload } from '../../contracts/bot.ts';
 import { resolveRule, resolveSheet } from './context.ts';
 import { clamp, fail, ok, optionString } from './options.ts';
-import { withActor } from './roll.ts';
 
 /** First plain integer after the skill/spec token — `san` for /sc, 技能值 for /en. */
 export function parseTrailingNumber(text: string, skipFirstToken: boolean): number | null {
@@ -34,7 +33,7 @@ function makeCheckHandler(name: string): CommandHandler {
     const { rule } = resolveRule(ctx, deps);
     const result = deps.coc.check(text, { sheet, rule, rng: deps.rng });
     if (!result.ok) return fail(result.error);
-    return ok(clamp(withActor(ctx, deps, result.lines.join('\n'))));
+    return ok(clamp(result.lines.join('\n')));
   };
 }
 
@@ -54,7 +53,7 @@ export const scHandler: CommandHandler = async (ctx, deps) => {
   });
   if (!result.ok) return fail(result.error);
   if (result.sheet) deps.store.putSheet(ctx.userId, result.sheet);
-  return ok(clamp(withActor(ctx, deps, result.lines.join('\n'))));
+  return ok(clamp(result.lines.join('\n')));
 };
 
 export const enHandler: CommandHandler = async (ctx, deps) => {
@@ -70,5 +69,5 @@ export const enHandler: CommandHandler = async (ctx, deps) => {
   });
   if (!result.ok) return fail(result.error);
   if (result.sheet) deps.store.putSheet(ctx.userId, result.sheet);
-  return ok(clamp(withActor(ctx, deps, result.lines.join('\n'))));
+  return ok(clamp(result.lines.join('\n')));
 };

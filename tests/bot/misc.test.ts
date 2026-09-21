@@ -6,6 +6,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { route } from '../../src/bot/router.ts';
+import { actorEcho } from '../../src/bot/handlers/context.ts';
 import { HANDLER_NAMES, handlersWithoutCommand, missingHandlers } from '../../src/bot/registry.ts';
 import { COMMAND_NAMES } from '../../src/bot/manifest.ts';
 import { FixedRng, makeContext, makeEnv, type CtxSpec, type TestEnv } from './fakes.ts';
@@ -93,14 +94,16 @@ describe('/help and /rules', () => {
 });
 
 describe('/nn, /nnn, /name', () => {
-  test('/nn set shows up as the 【称呼】 prefix on rolls; del removes it', async () => {
+  test('/nn set 会作为回执的【称呼】前缀出现（统一回显使用者）；del 清掉', async () => {
     const env = makeEnv();
     const set = await route(cmd(env, 'nn', { name: 'kp' }, { sub: 'set' }), env.deps);
     assert.notEqual(set.ephemeral, true);
     assert.equal(env.store.getNick('G1', 'C1', 'U1'), 'kp');
 
-    const roll = await route(cmd(env, 'r', { text: '1d100' }), env.deps);
-    assert.ok(roll.content.includes('【kp】'), roll.content);
+    const rollCtx = cmd(env, 'r', { text: '1d100' });
+    const roll = await route(rollCtx, env.deps);
+    // 回执前缀由 adapter 统一加：角色卡名 → 称呼 → 显示名；这里没绑卡，所以用称呼
+    assert.ok(actorEcho(env.store, rollCtx, rollCtx.displayName, roll.content).startsWith('【kp】'), roll.content);
 
     await route(cmd(env, 'nn', {}, { sub: 'del' }), env.deps);
     assert.equal(env.store.getNick('G1', 'C1', 'U1'), null);

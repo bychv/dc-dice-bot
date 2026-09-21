@@ -83,15 +83,9 @@ export function performRoll(
   };
 }
 
-/** `【称呼】` prefix when the user configured one (docs §12.1). */
-export function withNick(ctx: InteractionContext, deps: HandlerDeps, content: string): string {
-  const nick = resolveNick(ctx, deps);
-  return nick ? `【${nick}】${content}` : content;
-}
-
 /**
- * `【检定人】` 前缀（检定类回执用）：Discord 的斜杠命令不在频道里留玩家发言，日志只记骰娘回执，
- * 所以回执自带"谁在检定"（角色卡名 → 称呼 → 显示名，与日志说话人同一套解析，见 `actorLabel`）。
+ * `【使用者】` 前缀：**投递到不经过 handler 回执通道**的内容（如 `/rh` 投进私密子区的副本）用。
+ * 普通回执由回执出口（`src/bot` 的适配层）统一加前缀（`actorEcho`），这里不要重复调用。
  */
 export function withActor(ctx: InteractionContext, deps: HandlerDeps, content: string): string {
   return `【${actorLabel(ctx, deps)}】${content}`;
@@ -101,7 +95,7 @@ export const rHandler: CommandHandler = async (ctx, deps) => {
   const text = optionString(ctx, 'text');
   const outcome = performRoll(ctx, deps, text, { compact: false });
   if (!outcome.ok) return fail(`掷骰失败：${outcome.error ?? '无法解析的骰式'}`);
-  return ok(clamp(withNick(ctx, deps, outcome.lines.join('\n'))));
+  return ok(clamp(outcome.lines.join('\n')));
 };
 
 export const rsHandler: CommandHandler = async (ctx, deps) => {
@@ -111,5 +105,5 @@ export const rsHandler: CommandHandler = async (ctx, deps) => {
   }
   const outcome = performRoll(ctx, deps, text, { compact: true });
   if (!outcome.ok) return fail(`掷骰失败：${outcome.error ?? '无法解析的骰式'}`);
-  return ok(clamp(withNick(ctx, deps, outcome.lines.join('\n'))));
+  return ok(clamp(outcome.lines.join('\n')));
 };

@@ -138,7 +138,10 @@ export const rhHandler: CommandHandler = async (ctx, deps) => {
 
   const outcome = performRoll(ctx, deps, text, { compact: false });
   if (!outcome.ok) return fail(`掷骰失败：${outcome.error ?? '无法解析的骰式'}`);
-  const body = withActor(ctx, deps, outcome.lines.join('\n'));
+  // 投递到私密子区的那一份自己带 `【使用者】`（这条路不经过 handler 回执的统加前缀）；
+  // 回给发起者的 ephemeral 回执用不带前缀的 rawBody，由 adapter 统一加，避免叠两层。
+  const rawBody = outcome.lines.join('\n');
+  const body = withActor(ctx, deps, rawBody);
 
   // 降级时骰值无处投递：明说 KP 看不到，免得玩家以为 KP 已知情
   const degradationNotes = game
@@ -197,7 +200,7 @@ export const rhHandler: CommandHandler = async (ctx, deps) => {
           designated,
         )} 可见；频道内未发任何提示）。`,
     insider ? '' : '你的结果只在本条回执里可见（其他人看不到）：',
-    body,
+    rawBody,
     keeperIgnored,
     autoCreated ? '该私密子区已自动创建并复用，之后 `/rh` 会继续投到这里。' : '',
     explicitThread || (!game?.hiddenThreadId && !autoCreated)

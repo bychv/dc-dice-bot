@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import type { ChatInputCommandInteraction, Message } from 'discord.js';
 
 import { createLogRecorder, respond } from '../../src/bot/adapter.ts';
+import { actorEcho } from '../../src/bot/handlers/context.ts';
 import { botSpeakerName, speakerName } from '../../src/bot/logSpeaker.ts';
 import { route } from '../../src/bot/router.ts';
 import type { CharacterSheet } from '../../src/contracts/model.ts';
@@ -173,10 +174,10 @@ describe('检定回执带「检定人」', () => {
     env.store.putSheet('U1', sheet('陈寻川'));
     env.store.setBinding('scene', 'C1', 'U1', '陈寻川');
 
-    const reply = await route(
-      makeContext({ command: 'rc', channelId: 'C1', userId: 'U1', values: { text: '闪避' } }, env.platform),
-      env.deps,
-    );
+    const ctx = makeContext({ command: 'rc', channelId: 'C1', userId: 'U1', values: { text: '闪避' } }, env.platform);
+    const reply = await route(ctx, env.deps);
+    // 前缀由 adapter 的回执出口统一加（这里直接调用同一个 helper，等价于 handleInteraction 的行为）
+    reply.content = actorEcho(env.store, ctx, ctx.displayName, reply.content);
     assert.match(reply.content, /^【陈寻川】/, reply.content);
 
     // 骰娘回执按原口径入日志（名字是骰娘），但**正文自带检定人**——Discord 的斜杠命令
@@ -200,31 +201,28 @@ describe('检定回执带「检定人」', () => {
     assert.match(line, /闪避/, line);
   });
 
-  test('/sc 与 /en 同样带检定人；没卡时回退称呼/显示名', async () => {
+  test('/sc 与 /en 同样带使用者；没卡时回退称呼/显示名', async () => {
     const env = makeEnv();
     await openLogOnC1(env);
     env.store.putSheet('U1', sheet('陈寻川'));
     env.store.setBinding('scene', 'C1', 'U1', '陈寻川');
 
-    const sc = await route(
-      makeContext({ command: 'sc', channelId: 'C1', userId: 'U1', values: { text: '0/1 60' } }, env.platform),
-      env.deps,
-    );
-    assert.match(sc.content, /^【陈寻川】/, sc.content);
+    const scCtx = makeContext({ command: 'sc', channelId: 'C1', userId: 'U1', values: { text: '0/1 60' } }, env.platform);
+    const sc = await route(scCtx, env.deps);
+    assert.match(actorEcho(env.store, scCtx, scCtx.displayName, sc.content), /^【陈寻川】/, sc.content);
 
-    const en = await route(
-      makeContext({ command: 'en', channelId: 'C1', userId: 'U1', values: { text: '闪避 50' } }, env.platform),
-      env.deps,
-    );
-    assert.match(en.content, /^【陈寻川】/, en.content);
+    const enCtx = makeContext({ command: 'en', channelId: 'C1', userId: 'U1', values: { text: '闪避 50' } }, env.platform);
+    const en = await route(enCtx, env.deps);
+    assert.match(actorEcho(env.store, enCtx, enCtx.displayName, en.content), /^【陈寻川】/, en.content);
 
     // 没有角色卡也没有称呼 → 用 Discord 显示名
     env.store.putSheet('U2', sheet('别人卡'));
-    const stranger = await route(
-      makeContext({ command: 'rc', channelId: 'C1', userId: 'U9', displayName: '路人甲', values: { text: '力量 50' } }, env.platform),
-      env.deps,
+    const strangerCtx = makeContext(
+      { command: 'rc', channelId: 'C1', userId: 'U9', displayName: '路人甲', values: { text: '力量 50' } },
+      env.platform,
     );
-    assert.match(stranger.content, /^【路人甲】/, stranger.content);
+    const stranger = await route(strangerCtx, env.deps);
+    assert.match(actorEcho(env.store, strangerCtx, strangerCtx.displayName, stranger.content), /^【路人甲】/, stranger.content);
   });
 });
 

@@ -366,7 +366,7 @@ describe('W4 · adapter 按钮分支（fake interaction + 源码接线）', () =
 
     assert.equal(updates.length, 0, '不得 update 原回执（否则发起者就没法确认了）');
     assert.equal(followUps.length, 1);
-    assert.equal(followUps[0].content, NOT_OWNER_MESSAGE);
+    assert.equal(followUps[0].content, `【<@U2>】${NOT_OWNER_MESSAGE}`, '按钮回执带使用者前缀');
     assert.equal(env.confirmations.size(), 1);
   });
 

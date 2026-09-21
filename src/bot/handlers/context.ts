@@ -167,11 +167,25 @@ export function resolveSheet(ctx: InteractionContext, deps: HandlerDeps): Charac
  * 检定类回执的「**谁在检定**」标签：与日志说话人**同一套解析**（角色卡名 → 称呼 `/nn` → Discord 显示名）。
  *
  * 为什么需要：Discord 的斜杠命令**不会在频道里留下玩家发言**，日志里只记骰娘回执，
- * 于是 `/rc`、`/sc` 这类回执行在日志里变成"无主检定"（不知道是谁掷的）。
- * 现在 `/rc` `/ra` `/sc` `/en`（以及 `/rh`）的回执自带 `【检定人】` 前缀，日志因此可追溯。
+ * 于是回执行在日志里变成"无主"（不知道是谁发的）。
+ * **所有指令**的回执现在统一由回执出口（`src/bot` 的 adapter 层）加 `【使用者】` 前缀，按钮也一样。
  */
 export function actorLabel(ctx: InteractionContext, deps: HandlerDeps): string {
   return speakerName(deps.store, ctx, ctx.displayName);
+}
+
+/** `actorLabel` 的 store/SceneKey 版本（按钮流程没有完整 `ctx` 时用）。 */
+export function actorLabelFor(store: BotStore, key: SceneKey, displayName: string): string {
+  return speakerName(store, key, displayName);
+}
+
+/**
+ * 给回执加统一前缀 `【使用者】`（幂等：已经带 `【` 的不再叠加）。
+ * 只加在**回执**上；玩家消息的说话人仍由 `createLogRecorder` 逐行解析。
+ */
+export function actorEcho(store: BotStore, key: SceneKey, displayName: string, content: string): string {
+  if (content.startsWith('【')) return content;
+  return `【${actorLabelFor(store, key, displayName)}】${content}`;
 }
 
 /**
