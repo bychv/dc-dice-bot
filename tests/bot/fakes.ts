@@ -10,6 +10,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPendingActions } from '../../src/bot/confirm.ts';
+import { diceLogFileName, diceLogSessionName } from '../../src/bot/logFormat.ts';
 import type {
   BindingScope,
   CharacterSheet,
@@ -258,12 +259,33 @@ export class MemoryStore implements BotStore, NickStore, RuleSetStore, LogLineRe
     return targets.length;
   }
 
+  /**
+   * 与 `jsonStore.logFilePath` 同一套口径：默认名 `<会话名>_<日志名>.txt`（同名折叠），
+   * 且**只在 `fileName === null` 时**做同服同名去重（冲突加 `_<logId>`）——
+   * 替身必须跟真实 store 一致，否则 `/log end` 的文件名行为测不出来。
+   */
   logFilePath(log: LogRecord): string {
     const dir = join(this.dir, 'logs');
     mkdirSync(dir, { recursive: true });
-    const path = join(dir, log.fileName ?? `${log.id}.txt`);
+    let fileName = log.fileName ?? this.defaultLogFileName(log);
+    if (log.fileName === null) {
+      const taken = new Set(
+        [...this.logs.values()]
+          .filter((other) => other.id !== log.id && other.guildId === log.guildId)
+          .map((other) => other.fileName ?? this.defaultLogFileName(other)),
+      );
+      if (taken.has(fileName)) fileName = `${fileName.replace(/\.txt$/i, '')}_${log.id}.txt`;
+    }
+    const path = join(dir, fileName);
     writeFileSync(path, (this.lines.get(log.id) ?? []).join('\n'), 'utf8');
     return path;
+  }
+
+  private defaultLogFileName(log: LogRecord): string {
+    return diceLogFileName(
+      diceLogSessionName(log, (guildId, gameId) => this.getGame(guildId, gameId)),
+      log.name,
+    );
   }
 
   async flush(): Promise<void> {
