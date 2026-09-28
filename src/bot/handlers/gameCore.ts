@@ -213,16 +213,14 @@ export function exportLogRecord(
   log: LogRecord,
   endedAt: Date,
 ): { log: LogRecord; file: OutgoingFile } {
-  // 附件名与磁盘名一致：Dice! `<会话名>_<日志名>.txt`（会话名 = 局名，查不到回退日志名）
-  const fileName = diceLogFileName(
-    diceLogSessionName(log, (guildId, gameId) => deps.store.getGame(guildId, gameId)),
-    log.name,
-  );
+  // 附件名与磁盘名一致：Dice! `<会话名>_<日志名>.txt`（会话名 = 局名，查不到回退日志名）。
+  // **fileName 传 null**：同名去重只在 `fileName === null` 时做（`jsonStore.logFilePath`），
+  // 否则两条同名日志（例如两个都叫「观音误我」的局）会写到同一个文件、后导出的覆盖前一条。
   const ended: LogRecord = {
     ...log,
     state: 'ended',
     endedAt: endedAt.toISOString(),
-    fileName,
+    fileName: null,
   };
   const path = deps.store.logFilePath(ended);
   ended.fileName = basename(path);
