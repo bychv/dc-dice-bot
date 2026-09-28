@@ -49,9 +49,7 @@ export function buildCocEmbed(cards: Coc7RolledCard[]): ApiEmbed {
     title: cards.length === 1 ? 'CoC7 调查员卡' : `CoC7 调查员卡 ×${cards.length}`,
     color: COC_EMBED_COLOR,
     fields,
-    footer: {
-      text: 'CoC 7e 掷法：3D6×5；体型/智力/教育 (2D6+6)×5；幸运 3D6×5　|　仅供参考，要保存用 /pc new',
-    },
+    footer: { text: 'coc7e' },
   };
 }
 

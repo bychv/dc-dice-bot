@@ -85,7 +85,7 @@ describe('/coc 回执（embed）', () => {
     assert.match(field.value, /8 项总值 405/);
     assert.match(field.value, /含幸运 450/);
     assert.match(reply.content, /1 张调查员卡/);
-    assert.ok(embed.footer?.text.includes('2D6+6'), embed.footer?.text);
+    assert.equal(embed.footer?.text, 'coc7e', '页脚只标注规则版本，不写一大坨掷法说明');
   });
 
   test('多张合并到同一个 embed，并附合计（平均）行', async () => {
