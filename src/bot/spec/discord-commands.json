@@ -214,6 +214,29 @@
     ]
   },
   {
+    "name": "coc",
+    "description": "Roll CoC 7e investigator cards and show attribute totals",
+    "description_localizations": {
+      "zh-CN": "自动掷调查员卡（COC7 标准掷法；embed 展示 8 项总值与含幸运总值）"
+    },
+    "options": [
+      {
+        "type": 4,
+        "name": "count",
+        "description": "How many cards to roll (1-10, default 1)",
+        "name_localizations": {
+          "zh-CN": "数量"
+        },
+        "description_localizations": {
+          "zh-CN": "掷几张卡 1-10，默认 1；多张合并到同一条 embed"
+        },
+        "required": false,
+        "min_value": 1,
+        "max_value": 10
+      }
+    ]
+  },
+  {
     "name": "game",
     "description": "Manage concurrent sessions; KP, thread, sheets, rules and log follow the active one",
     "description_localizations": {

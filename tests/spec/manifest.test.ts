@@ -45,8 +45,8 @@ describe('command manifest vs docs/discord-commands.json', () => {
     assert.deepEqual(clone(COMMANDS), clone(documented));
   });
 
-  test('exposes 19 commands', () => {
-    assert.equal(COMMANDS.length, 19);
+  test('exposes 20 commands', () => {
+    assert.equal(COMMANDS.length, 20);
   });
 
   test('uses only lowercase ASCII command names', () => {

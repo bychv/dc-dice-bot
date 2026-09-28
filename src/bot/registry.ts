@@ -8,6 +8,7 @@
 import type { CommandHandler } from '../contracts/bot.ts';
 import { COMMAND_NAMES } from './manifest.ts';
 
+import { cocHandler } from './handlers/coc.ts';
 import { helpHandler } from './handlers/help.ts';
 import { rulesHandler } from './handlers/rules.ts';
 import { rHandler, rsHandler } from './handlers/roll.ts';
@@ -28,6 +29,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
   r: rHandler,
   rh: rhHandler,
   rs: rsHandler,
+  coc: cocHandler,
   game: gameHandler,
   pc: pcHandler,
   st: stHandler,

@@ -57,6 +57,20 @@ export interface ApiActionRow {
   components: ApiButton[];
 }
 
+/**
+ * Discord API 形状的 embed（只做透传：handler 负责内容，adapter 负责转发）。
+ * 字段按需扩展；`fields` 是卡片类输出的主力。
+ */
+export interface ApiEmbed {
+  title?: string;
+  description?: string;
+  /** 十进制 RGB，例如 0x6b46c1 */
+  color?: number;
+  fields?: { name: string; value: string; inline?: boolean }[];
+  footer?: { text: string };
+  timestamp?: string;
+}
+
 export interface ReplyPayload {
   content: string;
   /** ephemeral replies are only visible to the invoker */
@@ -64,6 +78,8 @@ export interface ReplyPayload {
   files?: OutgoingFile[];
   /** 一次确认/取消按钮行（docs §16.6 破坏性操作的二次确认） */
   components?: ApiActionRow[];
+  /** embed 内容（可以有多条；Discord 单条消息最多 10 个） */
+  embeds?: ApiEmbed[];
   /**
    * 回执是不是"成功"结果：`ok()` 为 true、`fail()` 为 false，确认/按钮流程可能缺省。
    * 只用于运行日志（`audit.ts`）与测试观察，不影响发送。

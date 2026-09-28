@@ -1,7 +1,7 @@
 /**
  * W4 独立验证 · 结构 / 命令清单漂移 / 写作用域
  *
- * 1) manifest、src/bot/spec/discord-commands.json、docs/discord-commands.json 三份深度相等（19 条）。
+ * 1) manifest、src/bot/spec/discord-commands.json、docs/discord-commands.json 三份深度相等（20 条）。
  * 2) `/pc clr`、`/st` **没有任何新增命令选项**：二次确认必须是回执组件而不是新 option。
  * 3) 本轮改动没有漂移权威 spec（用 mtime 佐证 spec 早于新特性文件）。
  * 4) handlers / registry / router / confirm / library / logFormat / jsonStore / gameCore 不依赖 discord.js。
@@ -60,7 +60,7 @@ const DOCS = readJson(join(REPO, 'docs', 'discord-commands.json'));
 const BUNDLED = readJson(join(SRC, 'bot', 'spec', 'discord-commands.json'));
 
 describe('W4-结构 · 命令清单没有漂移', () => {
-  test('三份清单深度相等，恰好 19 条且名称顺序不变', () => {
+  test('三份清单深度相等，恰好 20 条且名称顺序不变', () => {
     assert.equal(canonical(COMMANDS), canonical(DOCS));
     assert.equal(canonical(BUNDLED), canonical(DOCS));
     assert.deepEqual(COMMAND_NAMES, [
@@ -69,6 +69,7 @@ describe('W4-结构 · 命令清单没有漂移', () => {
       'r',
       'rh',
       'rs',
+      'coc',
       'game',
       'pc',
       'st',
@@ -84,11 +85,11 @@ describe('W4-结构 · 命令清单没有漂移', () => {
       'nnn',
       'name',
     ]);
-    assert.equal(DOCS.length, 19);
+    assert.equal(DOCS.length, 20);
     assert.deepEqual(missingHandlers(), []);
     assert.deepEqual(handlersWithoutCommand(), []);
-    assert.equal(HANDLER_NAMES.length, 19);
-    assert.equal(Object.keys(createRegistry()).length, 19);
+    assert.equal(HANDLER_NAMES.length, 20);
+    assert.equal(Object.keys(createRegistry()).length, 20);
     for (const name of COMMAND_NAMES) assert.equal(typeof HANDLERS[name], 'function');
   });
 
@@ -132,8 +133,8 @@ describe('W4-结构 · 命令清单没有漂移', () => {
     assert.equal(bundled, docs, '打包副本必须与 docs/discord-commands.json 逐字节一致');
     const problems = validateManifest(JSON.parse(docs) as never);
     assert.deepEqual(problems, [], `payload 不合法：\n${problems.join('\n')}`);
-    // 命令清单仍是 19 条，且没有新增子命令
-    assert.equal((JSON.parse(docs) as unknown[]).length, 19);
+    // 命令清单仍是 20 条，且没有新增子命令
+    assert.equal((JSON.parse(docs) as unknown[]).length, 20);
     assert.ok(statSync(join(SRC, 'bot', 'confirm.ts')).isFile());
   });
 });

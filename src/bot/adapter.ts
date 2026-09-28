@@ -280,12 +280,14 @@ export async function respond(
     .map((file) => ({ attachment: file.data, name: file.name }));
   const hasFiles = files !== undefined && files.length > 0;
   const components = replyComponents(payload);
+  const embeds = payload.embeds?.length ? payload.embeds : undefined;
 
   const send = async (withFiles: boolean): Promise<void> => {
     if (interaction.deferred || interaction.replied) {
       const options: InteractionEditReplyOptions = { content: payload.content };
       if (withFiles && hasFiles) options.files = files;
       if (components) options.components = components;
+      if (embeds) options.embeds = embeds;
       await interaction.editReply(options);
       return;
     }
@@ -293,6 +295,7 @@ export async function respond(
     if (withFiles && hasFiles) options.files = files;
     if (payload.ephemeral) options.flags = MessageFlags.Ephemeral;
     if (components) options.components = components;
+    if (embeds) options.embeds = embeds;
     // No deferral: the interaction is answered within Discord's 3s window; heavy commands are
     // pure REST calls (one thread create + one log write), so this stays well inside it.
     await interaction.reply(options);
@@ -332,7 +335,22 @@ export async function respond(
 
   if (!deps || payload.ephemeral) return;
   if (interaction.commandName === 'log') return;
-  logBotReply(deps, interaction, payload.content);
+  logBotReply(deps, interaction, logTextOf(payload));
+}
+
+/**
+ * 入日志的正文：embed 内容也要记下来——日志里只记 `content` 的话，
+ * "用 embed 展示结果"的命令（如 `/coc` 掷卡）在日志里会只剩一句"已掷 3 张卡"，看不到数据。
+ */
+function logTextOf(payload: ReplyPayload): string {
+  const embedText = (payload.embeds ?? [])
+    .flatMap((embed) => [
+      ...(embed.title ? [embed.title] : []),
+      ...(embed.description ? [embed.description] : []),
+      ...(embed.fields ?? []).map((field) => `${field.name}：${field.value}`),
+    ])
+    .join('\n');
+  return [payload.content, embedText].filter((part) => part.length > 0).join('\n');
 }
 
 /**
@@ -446,7 +464,7 @@ export async function handleButtonInteraction(
 
   // 按钮走的是 update 而不是 respond，所以这里要补记骰娘回执，否则日志里只有危险警告、
   // 看不到最终结果（Dice! 没有按钮流程，但"骰娘回执都入日志"的语义要一致）。
-  logBotReply(deps, interaction, payload.content);
+  logBotReply(deps, interaction, logTextOf(payload));
 }
 
 /**

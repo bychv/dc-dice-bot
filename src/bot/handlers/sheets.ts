@@ -49,6 +49,41 @@ export function rollCoc7Attrs(rng: IntRng): Record<string, string> {
   return attrs;
 }
 
+/** CoC 7e 手册的掷法：`(2d6+6)×5` 的属性（体型/智力/教育）。 */
+export const COC7_BONUS6_ATTRS: readonly string[] = ['体型', '智力', '教育'];
+
+export interface Coc7RolledCard {
+  /** 8 项基础属性（不含幸运） */
+  attrs: Record<string, string>;
+  /** 幸运 3d6×5 */
+  luck: number;
+  /** 8 项基础属性总值 */
+  baseTotal: number;
+  /** 8 项基础属性 + 幸运 的总值 */
+  totalWithLuck: number;
+}
+
+/**
+ * **CoC 7e 标准掷法**掷一张调查员卡（docs §5.4 `/coc`）：
+ *   力量/体质/敏捷/外貌/意志 = 3d6×5；体型/智力/教育 = (2d6+6)×5；幸运 = 3d6×5。
+ * （`rollCoc7Attrs` 是简化的"全部 3d6×5"，`/pc new` 仍在用它，两者刻意分开。）
+ */
+export function rollCoc7Card(rng: IntRng): Coc7RolledCard {
+  const d6 = (): number => rng.int(1, 6);
+  const threeD6 = (): number => d6() + d6() + d6();
+  const attrs: Record<string, string> = {};
+  let baseTotal = 0;
+  for (const attr of COC7_PRIMARY_ATTRS) {
+    if (attr === '幸运') continue;
+    const dice = COC7_BONUS6_ATTRS.includes(attr) ? d6() + d6() + 6 : threeD6();
+    const value = dice * 5;
+    attrs[attr] = String(value);
+    baseTotal += value;
+  }
+  const luck = threeD6() * 5;
+  return { attrs, luck, baseTotal, totalWithLuck: baseTotal + luck };
+}
+
 /** `show`-style listing: attributes then stored roll expressions. */
 export function renderSheet(sheet: CharacterSheet): string[] {
   const lines: string[] = [`【${sheet.name}】模板 ${sheet.template}`];
