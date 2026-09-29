@@ -60,7 +60,7 @@ const DOCS = readJson(join(REPO, 'docs', 'discord-commands.json'));
 const BUNDLED = readJson(join(SRC, 'bot', 'spec', 'discord-commands.json'));
 
 describe('W4-结构 · 命令清单没有漂移', () => {
-  test('三份清单深度相等，恰好 20 条且名称顺序不变', () => {
+  test('三份清单深度相等，恰好 21 条且名称顺序不变', () => {
     assert.equal(canonical(COMMANDS), canonical(DOCS));
     assert.equal(canonical(BUNDLED), canonical(DOCS));
     assert.deepEqual(COMMAND_NAMES, [
@@ -84,12 +84,13 @@ describe('W4-结构 · 命令清单没有漂移', () => {
       'nn',
       'nnn',
       'name',
+      'sn',
     ]);
-    assert.equal(DOCS.length, 20);
+    assert.equal(DOCS.length, 21);
     assert.deepEqual(missingHandlers(), []);
     assert.deepEqual(handlersWithoutCommand(), []);
-    assert.equal(HANDLER_NAMES.length, 20);
-    assert.equal(Object.keys(createRegistry()).length, 20);
+    assert.equal(HANDLER_NAMES.length, 21);
+    assert.equal(Object.keys(createRegistry()).length, 21);
     for (const name of COMMAND_NAMES) assert.equal(typeof HANDLERS[name], 'function');
   });
 
@@ -133,8 +134,8 @@ describe('W4-结构 · 命令清单没有漂移', () => {
     assert.equal(bundled, docs, '打包副本必须与 docs/discord-commands.json 逐字节一致');
     const problems = validateManifest(JSON.parse(docs) as never);
     assert.deepEqual(problems, [], `payload 不合法：\n${problems.join('\n')}`);
-    // 命令清单仍是 20 条，且没有新增子命令
-    assert.equal((JSON.parse(docs) as unknown[]).length, 20);
+    // 命令清单仍是 21 条，且没有新增子命令
+    assert.equal((JSON.parse(docs) as unknown[]).length, 21);
     assert.ok(statSync(join(SRC, 'bot', 'confirm.ts')).isFile());
   });
 });

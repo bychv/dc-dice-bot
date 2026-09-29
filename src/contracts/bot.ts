@@ -123,6 +123,10 @@ export interface Platform {
   threadName(threadId: string): Promise<string | null>;
   /** whether the bot may create threads in this channel */
   canCreateThreads(channelId: string): Promise<boolean>;
+  /** 成员在当前服务器的昵称（`null` = 没有自定义昵称，即用的是用户名） */
+  memberNickname(guildId: string, userId: string): Promise<string | null>;
+  /** 设置成员昵称（`null` 恢复默认用户名）；无权限/服主/角色层位不足时抛错 */
+  setMemberNickname(guildId: string, userId: string, nickname: string | null): Promise<void>;
 }
 
 /**

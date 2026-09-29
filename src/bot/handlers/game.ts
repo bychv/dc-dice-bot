@@ -8,6 +8,7 @@
 import type { CommandHandler, HandlerDeps, InteractionContext, OutgoingFile, ReplyPayload } from '../../contracts/bot.ts';
 import type { GameRecord } from '../../contracts/model.ts';
 import { activeLog, currentGame, resolveRule } from './context.ts';
+import { describeOutcome, restoreSceneNicknames, sceneStillRecording } from './nickSync.ts';
 import {
   fmtGameLine,
   fmtLogLine,
@@ -190,8 +191,7 @@ async function gameEnd(ctx: InteractionContext, deps: HandlerDeps): Promise<Repl
 
   const lines = [
     `已结束 ${target.id} ${target.name}（KP:${mentionUser(target.keeperId)}）。`,
-    exported.length > 0 ? `导出日志：\n${exported.map((e) => `· ${e}`).join('\n')}` : '本局没有未结束的日志。',
-    uploadFailures.length > 0
+    exported.length > 0 ? `导出日志：\n${exported.map((e) => `· ${e}`).join('\n')}` : '本局没有未结束的日志。',    uploadFailures.length > 0
       ? `⚠️ 以下日志上传对象存储失败，已改用附件：${uploadFailures.join('；')}`
       : '',
     archive
@@ -201,6 +201,11 @@ async function gameEnd(ctx: InteractionContext, deps: HandlerDeps): Promise<Repl
       : '子区保持原样（未归档）。',
     '本局场景已解绑；角色卡数据与其他局不受影响。',
   ];
+  // `/sn`：本局的日志都已结束 → 把统计昵称改回原名（本场景没有别的在记录的日志时）
+  if (!sceneStillRecording(ctx, deps)) {
+    const note = describeOutcome(await restoreSceneNicknames(ctx, deps), '还原');
+    if (note) lines.push(note);
+  }
   return ok(clamp(lines.join('\n')), files);
 }
 

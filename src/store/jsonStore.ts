@@ -20,11 +20,12 @@ import type {
   GameRecord,
   HouseRule,
   LogRecord,
+  NickSyncState,
 } from '../contracts/model.ts';
 import type { BindingEntry, BotStore, StoreOptions } from '../contracts/store.ts';
 // pure formatter (no Discord dependency): the export file name follows Dice! `DiceSession::log_new`
 import { diceLogFileName, diceLogSessionName } from '../bot/logFormat.ts';
-import type { LogLineReader, NickStore, RuleSetStore } from './extras.ts';
+import type { LogLineReader, NickStore, NickSyncStore, RuleSetStore } from './extras.ts';
 
 type SheetsDb = Record<string, Record<string, CharacterSheet>>;
 type BindingMap = Record<string, Record<string, string>>;
@@ -41,7 +42,12 @@ type ScenesDb = Record<string, SceneRow>;
 type RulesDb = { game: Record<string, HouseRule>; scene: Record<string, HouseRule> };
 type ThreadsDb = Record<string, string>;
 type LogsDb = { logs: Record<string, LogRecord>; lines: Record<string, string[]>; nextId: number };
-type MiscDb = { nicks: Record<string, string>; ruleSets: Record<string, string> };
+type MiscDb = {
+  nicks: Record<string, string>;
+  ruleSets: Record<string, string>;
+  /** `/sn` 统计昵称同步：键 `${guildId}\u0000${userId}` → JSON 化的 NickSyncState */
+  nickSync: Record<string, string>;
+};
 
 const FILES = {
   sheets: 'sheets.json',
@@ -93,7 +99,7 @@ function ruleKey(gameId: string, guildId?: string): string {
   return guildId === undefined ? gameId : `${guildId}|${gameId}`;
 }
 
-class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
+class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader, NickSyncStore {
   readonly dir: string;
 
   private sheets: SheetsDb;
@@ -124,7 +130,7 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
     this.rules = readJson<RulesDb>(join(this.dir, FILES.rules), { game: {}, scene: {} });
     this.threads = readJson<ThreadsDb>(join(this.dir, FILES.threads), {});
     this.logs = readJson<LogsDb>(join(this.dir, FILES.logs), { logs: {}, lines: {}, nextId: 0 });
-    this.misc = readJson<MiscDb>(join(this.dir, FILES.misc), { nicks: {}, ruleSets: {} });
+    this.misc = readJson<MiscDb>(join(this.dir, FILES.misc), { nicks: {}, ruleSets: {}, nickSync: {} });
 
     // normalise a partially written / hand-edited file
     if (!this.bindings.game) this.bindings = { game: {}, scene: {}, user: {}, global: {} };
@@ -135,7 +141,10 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
     if (!this.rules.game) this.rules = { game: {}, scene: {} };
     if (!this.logs.logs) this.logs = { logs: {}, lines: {}, nextId: 0 };
     if (!this.logs.lines) this.logs.lines = {};
-    if (!this.misc.nicks) this.misc = { nicks: {}, ruleSets: {} };
+    if (!this.misc.nicks) this.misc = { nicks: {}, ruleSets: {}, nickSync: {} };
+    // 老版本没有 nickSync（`/sn` 统计昵称同步），补一张空表
+    if (!this.misc.ruleSets) this.misc.ruleSets = {};
+    if (!this.misc.nickSync) this.misc.nickSync = {};
   }
 
   // ---- persistence ------------------------------------------------------
@@ -553,6 +562,43 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
     }
     if (removed > 0) this.markDirty('misc');
     return removed;
+  }
+
+  // ---- /sn 统计昵称同步（docs §12.4）-------------------------------------
+
+  private static nickSyncKey(guildId: string, userId: string): string {
+    return `${guildId}\u0000${userId}`;
+  }
+
+  getNickSync(guildId: string, userId: string): NickSyncState | null {
+    const raw = this.misc.nickSync[JsonStore.nickSyncKey(guildId, userId)];
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as NickSyncState;
+    } catch {
+      return null;
+    }
+  }
+
+  setNickSync(guildId: string, userId: string, state: NickSyncState | null): void {
+    const key = JsonStore.nickSyncKey(guildId, userId);
+    if (state === null) delete this.misc.nickSync[key];
+    else this.misc.nickSync[key] = JSON.stringify(state);
+    this.markDirty('misc');
+  }
+
+  listNickSync(guildId: string): Array<{ userId: string; state: NickSyncState }> {
+    const prefix = `${guildId}\u0000`;
+    const rows: Array<{ userId: string; state: NickSyncState }> = [];
+    for (const [key, raw] of Object.entries(this.misc.nickSync)) {
+      if (!key.startsWith(prefix)) continue;
+      try {
+        rows.push({ userId: key.slice(prefix.length), state: JSON.parse(raw) as NickSyncState });
+      } catch {
+        // 坏数据忽略
+      }
+    }
+    return rows.sort((a, b) => a.userId.localeCompare(b.userId));
   }
 
   getDefaultRuleSet(guildId: string | null): string | null {

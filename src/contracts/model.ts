@@ -29,6 +29,17 @@ export interface CharacterSheet {
  */
 export type BindingScope = 'game' | 'scene' | 'user' | 'global';
 
+/**
+ * `/sn` 统计昵称同步的状态（按 **服务器 + 用户** 存）。
+ *   - `enabled`：该玩家是否开启"开 log 时把服务器昵称改成 `角色名 |DEX70 HP12/12 SAN70`"；
+ *   - `original`：**改名前**的服务器昵称（`null` = 原本没有自定义昵称）；
+ *     字段缺省 = 还没改过名，所以 `log off` 时不需要"改回"。
+ */
+export interface NickSyncState {
+  enabled: boolean;
+  original?: string | null;
+}
+
 export type GameStatus = 'active' | 'ended';
 
 /** 一局 = 携带 KP / 主场景 / 暗骰子区 / 卡绑定 / 房规 / 日志 的上下文. */

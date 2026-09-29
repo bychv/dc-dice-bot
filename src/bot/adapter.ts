@@ -255,6 +255,23 @@ export function createDiscordPlatform(client: Client): Platform {
         permissions.has(PermissionsBitField.Flags.SendMessagesInThreads)
       );
     },
+
+    /** `/sn` 用：读成员在当前服务器的昵称（`null` = 没设自定义昵称）。 */
+    async memberNickname(guildId: string, userId: string): Promise<string | null> {
+      const guild = await client.guilds.fetch(guildId);
+      const member = await guild.members.fetch(userId);
+      return member.nickname ?? null;
+    },
+
+    /**
+     * `/sn` 用：设置成员昵称（`null` 恢复默认用户名）。
+     * 需要「管理昵称」权限，且 bot 的最高角色要高于目标成员；服主永远改不了 → 抛错由调用方汇总。
+     */
+    async setMemberNickname(guildId: string, userId: string, nickname: string | null): Promise<void> {
+      const guild = await client.guilds.fetch(guildId);
+      const member = await guild.members.fetch(userId);
+      await member.setNickname(nickname);
+    },
   };
 }
 

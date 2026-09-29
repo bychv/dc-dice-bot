@@ -9,6 +9,7 @@ import type { HandlerDeps, InteractionContext, OutgoingFile } from '../../contra
 import type { GameRecord, LogRecord, LogState } from '../../contracts/model.ts';
 import { diceLogFileName, diceLogSessionName } from '../logFormat.ts';
 import { fmtStamp } from './format.ts';
+import { applySceneNicknames, describeOutcome } from './nickSync.ts';
 
 export interface StartGameInput {
   name: string;
@@ -179,6 +180,10 @@ export async function startGame(
   });
   game.currentLogId = log.id;
   deps.store.putGame(game);
+
+  // `/sn`：开局即开 log → 给开启了统计昵称同步的成员改名（docs §12.4）
+  const syncNote = describeOutcome(await applySceneNicknames(ctx, deps), '同步');
+  if (syncNote) notes.push(syncNote);
 
   return { game, log, sceneId, notes };
 }

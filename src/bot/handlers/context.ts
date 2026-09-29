@@ -11,15 +11,18 @@ import type {
   GameRecord,
   HouseRule,
   LogRecord,
+  NickSyncState,
 } from '../../contracts/model.ts';
 import { HOUSE_RULES } from '../../contracts/model.ts';
 import type { BotStore } from '../../contracts/store.ts';
 import {
   isLogLineReader,
   isNickStore,
+  isNickSyncStore,
   isRuleSetStore,
   type LogLineReader,
   type NickStore,
+  type NickSyncStore,
   type RuleSetStore,
 } from '../../store/extras.ts';
 import { createSheet, uniqueSheetName } from './sheets.ts';
@@ -373,6 +376,39 @@ const fallbackRuleSets = new MemoryRuleSetStore();
 
 export function ruleSetStore(store: BotStore): RuleSetStore {
   return isRuleSetStore(store) ? store : fallbackRuleSets;
+}
+
+/** `/sn` 统计昵称同步的登记表（docs §12.4）。 */
+class MemoryNickSyncStore implements NickSyncStore {
+  private rows = new Map<string, NickSyncState>();
+
+  private static key(guildId: string, userId: string): string {
+    return `${guildId}\u0000${userId}`;
+  }
+
+  getNickSync(guildId: string, userId: string): NickSyncState | null {
+    return this.rows.get(MemoryNickSyncStore.key(guildId, userId)) ?? null;
+  }
+
+  setNickSync(guildId: string, userId: string, state: NickSyncState | null): void {
+    const key = MemoryNickSyncStore.key(guildId, userId);
+    if (state === null) this.rows.delete(key);
+    else this.rows.set(key, state);
+  }
+
+  listNickSync(guildId: string): Array<{ userId: string; state: NickSyncState }> {
+    const prefix = `${guildId}\u0000`;
+    return [...this.rows.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, state]) => ({ userId: key.slice(prefix.length), state }))
+      .sort((a, b) => a.userId.localeCompare(b.userId));
+  }
+}
+
+const fallbackNickSync = new MemoryNickSyncStore();
+
+export function nickSyncStore(store: BotStore): NickSyncStore {
+  return isNickSyncStore(store) ? store : fallbackNickSync;
 }
 
 /** Display nickname: 频道称呼 > 全局称呼 (docs §12.1). */

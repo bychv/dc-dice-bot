@@ -18,6 +18,7 @@ import { pcHandler } from './handlers/pc.ts';
 import { stHandler } from './handlers/st.ts';
 import { enHandler, raHandler, rcHandler, scHandler } from './handlers/check.ts';
 import { setcocHandler } from './handlers/setcoc.ts';
+import { snHandler } from './handlers/sn.ts';
 import { liHandler, tiHandler } from './handlers/madness.ts';
 import { logHandler } from './handlers/log.ts';
 import { nnHandler, nnnHandler } from './handlers/nickname.ts';
@@ -36,6 +37,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
   rc: rcHandler,
   ra: raHandler,
   setcoc: setcocHandler,
+  sn: snHandler,
   sc: scHandler,
   ti: tiHandler,
   li: liHandler,

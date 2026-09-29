@@ -17,8 +17,10 @@ import type {
   GameRecord,
   HouseRule,
   LogRecord,
+  NickSyncState,
 } from '../../src/contracts/model.ts';
 import type { BindingEntry, BotStore } from '../../src/contracts/store.ts';
+import type { NickSyncStore } from '../../src/store/extras.ts';
 
 /** 沙箱不允许写系统临时目录（EPERM），测试数据一律放在包内 .tmp/. */
 const TMP_ROOT = fileURLToPath(new URL('../.tmp/', import.meta.url));
@@ -47,7 +49,7 @@ import type { LogLineReader, NickStore, RuleSetStore } from '../../src/store/ext
 // store
 // ---------------------------------------------------------------------------
 
-export class MemoryStore implements BotStore, NickStore, RuleSetStore, LogLineReader {
+export class MemoryStore implements BotStore, NickStore, RuleSetStore, LogLineReader, NickSyncStore {
   sheets = new Map<string, Map<string, CharacterSheet>>();
   bindings: Record<BindingScope, Map<string, Map<string, string>>> = {
     game: new Map(),
@@ -328,6 +330,28 @@ export class MemoryStore implements BotStore, NickStore, RuleSetStore, LogLineRe
     return removed;
   }
 
+  // ---- `/sn` 统计昵称同步（docs §12.4）---------------------------------
+
+  nickSync = new Map<string, NickSyncState>();
+
+  getNickSync(guildId: string, userId: string): NickSyncState | null {
+    return this.nickSync.get(`${guildId}|${userId}`) ?? null;
+  }
+
+  setNickSync(guildId: string, userId: string, state: NickSyncState | null): void {
+    const key = `${guildId}|${userId}`;
+    if (state === null) this.nickSync.delete(key);
+    else this.nickSync.set(key, state);
+  }
+
+  listNickSync(guildId: string): Array<{ userId: string; state: NickSyncState }> {
+    const prefix = `${guildId}|`;
+    return [...this.nickSync.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, state]) => ({ userId: key.slice(prefix.length), state }))
+      .sort((a, b) => a.userId.localeCompare(b.userId));
+  }
+
   getDefaultRuleSet(guildId: string | null): string | null {
     return this.ruleSets.get(guildId ?? '@dm') ?? null;
   }
@@ -408,6 +432,30 @@ export class FakePlatform implements Platform {
 
   async canCreateThreads(): Promise<boolean> {
     return this.canCreate;
+  }
+
+  // ---- `/sn` 统计昵称同步用的假实现 -------------------------------------
+
+  /** `guildId:userId` → 当前昵称（`null` = 没设自定义昵称） */
+  nicknames = new Map<string, string | null>();
+  /** 预置这些 userId → 改名时抛错（模拟无权限/服主/角色层位不足） */
+  nicknameErrors = new Set<string>();
+  /** 改名调用记录（按顺序） */
+  nicknameCalls: { guildId: string; userId: string; nickname: string | null }[] = [];
+
+  private nickKey(guildId: string, userId: string): string {
+    return `${guildId}:${userId}`;
+  }
+
+  async memberNickname(guildId: string, userId: string): Promise<string | null> {
+    return this.nicknames.get(this.nickKey(guildId, userId)) ?? null;
+  }
+
+  async setMemberNickname(guildId: string, userId: string, nickname: string | null): Promise<void> {
+    if (this.nicknameErrors.has(userId)) throw new Error('Missing Permissions');
+    this.nicknameCalls.push({ guildId, userId, nickname });
+    if (nickname === null) this.nicknames.delete(this.nickKey(guildId, userId));
+    else this.nicknames.set(this.nickKey(guildId, userId), nickname);
   }
 }
 

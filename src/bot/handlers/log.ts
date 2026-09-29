@@ -16,6 +16,12 @@ import { activeLog, currentGame, findLogByName, scopedLogs } from './context.ts'
 import { fmtDateTime, fmtLogLine, fmtStamp, mentionChannel } from './format.ts';
 import { createLog, exportLogRecord, pauseAbandonedLogs } from './gameCore.ts';
 import { clamp, fail, ok, optionString, subcommand } from './options.ts';
+import {
+  applySceneNicknames,
+  describeOutcome,
+  restoreSceneNicknames,
+  sceneStillRecording,
+} from './nickSync.ts';
 
 function refusal(recording: LogRecord): ReplyPayload {
   return fail(
@@ -94,6 +100,9 @@ async function logNew(ctx: InteractionContext, deps: HandlerDeps): Promise<Reply
       `暂停中的旧日志原样保留：${kept.map((l) => `「${l.name}」`).join('、')}（不自动结束、不导出；需要时 \`/log end name:<旧日志名>\`）。`,
     );
   }
+  // `/sn`：开 log → 给开启了统计昵称同步的成员改名（docs §12.4）
+  const syncNote = describeOutcome(await applySceneNicknames(ctx, deps), '同步');
+  if (syncNote) lines.push(syncNote);
   return ok(clamp(lines.join('\n')));
 }
 
@@ -112,8 +121,16 @@ async function logList(ctx: InteractionContext, deps: HandlerDeps): Promise<Repl
 }
 
 async function logOn(ctx: InteractionContext, deps: HandlerDeps): Promise<ReplyPayload> {
-  const log = activeLog(ctx, deps);
-  if (!log) return fail('当前没有日志；用 `/log new` 开一条。');
+  // 没有任何日志在记录时，恢复本场景**最近暂停**的一条。
+  // （`/log off` 的回执承诺了"可 `/log on` 继续"，而 `activeLog` 只看 state==='on' 和局指针，
+  //   无局的场景日志暂停后会两边都落空 → 这里兜底。）
+  const log =
+    activeLog(ctx, deps) ??
+    scopedLogs(ctx, deps)
+      .filter((l) => l.state === 'off')
+      .sort((a, b) => (a.startedAt === b.startedAt ? 0 : a.startedAt < b.startedAt ? 1 : -1))[0] ??
+    null;
+  if (!log) return fail('本场景没有可继续的日志；用 `/log new` 开一条。');
   if (log.state === 'ended') return fail(`日志「${log.name}」已结束，请用 \`/log new\` 开新日志。`);
 
   const others = scopedLogs(ctx, deps).filter((l) => l.state === 'on' && l.id !== log.id);
@@ -129,6 +146,9 @@ async function logOn(ctx: InteractionContext, deps: HandlerDeps): Promise<ReplyP
   if (others.length > 0) {
     lines.push(`为保持唯一性，已暂停：${others.map((l) => `「${l.name}」`).join('、')}`);
   }
+  // `/sn`：开 log → 给开启了统计昵称同步的成员改名（docs §12.4）
+  const syncNote = describeOutcome(await applySceneNicknames(ctx, deps), '同步');
+  if (syncNote) lines.push(syncNote);
   return ok(lines.join('\n'));
 }
 
@@ -137,7 +157,13 @@ async function logOff(ctx: InteractionContext, deps: HandlerDeps): Promise<Reply
   if (!log) return fail('当前没有日志；用 `/log new` 开一条。');
   if (log.state === 'ended') return fail(`日志「${log.name}」已结束。`);
   deps.store.putLog({ ...log, state: 'off' });
-  return ok(`已暂停日志「${log.name}」。日志保留，可 \`/log on\` 继续或 \`/log end\` 导出。`);
+  const lines = [`已暂停日志「${log.name}」。日志保留，可 \`/log on\` 继续或 \`/log end\` 导出。`];
+  // `/sn`：本场景不再有在记录的日志 → 把统计昵称改回原名
+  if (!sceneStillRecording(ctx, deps)) {
+    const note = describeOutcome(await restoreSceneNicknames(ctx, deps), '还原');
+    if (note) lines.push(note);
+  }
+  return ok(lines.join('\n'));
 }
 
 async function logEnd(ctx: InteractionContext, deps: HandlerDeps): Promise<ReplyPayload> {
@@ -160,9 +186,14 @@ async function logEnd(ctx: InteractionContext, deps: HandlerDeps): Promise<Reply
     game.currentLogId = null;
     deps.store.putGame(game);
   }
+  // `/sn`：本场景不再有在记录的日志 → 还原统计昵称（先算好，拼到各条回执里）
+  const syncNote = !sceneStillRecording(ctx, deps)
+    ? describeOutcome(await restoreSceneNicknames(ctx, deps), '还原')
+    : '';
+  const tail = syncNote ? `\n${syncNote}` : '';
   if (empty) {
     // 0 字节附件会被 Discord 拒绝，这里直接说明（Dice! 的 strLogEndEmpty 语义）
-    return ok(`已结束日志「${ended.name}」√\n本次无日志产生（没有记录到任何消息）。`);
+    return ok(`已结束日志「${ended.name}」√\n本次无日志产生（没有记录到任何消息）。${tail}`);
   }
 
   // 配了对象存储（Cloudflare R2）就上传并发链接：Discord 附件上传会超时/被拒，链接也更耐存
@@ -173,11 +204,11 @@ async function logEnd(ctx: InteractionContext, deps: HandlerDeps): Promise<Reply
     const uploaded = await deps.logUpload.upload(file);
     if (uploaded.ok) {
       const expiry = uploaded.presigned ? '（链接有有效期，过期后请重新导出）' : '';
-      return ok(`${header}\n📎 下载：${uploaded.url}${expiry}`);
+      return ok(`${header}\n📎 下载：${uploaded.url}${expiry}${tail}`);
     }
-    return ok(`${header}\n⚠️ 上传到对象存储失败，改用附件：${uploaded.error}`, [file]);
+    return ok(`${header}\n⚠️ 上传到对象存储失败，改用附件：${uploaded.error}${tail}`, [file]);
   }
-  return ok(header, [file]);
+  return ok(`${header}${tail}`, [file]);
 }
 
 export const logHandler: CommandHandler = async (ctx, deps) => {

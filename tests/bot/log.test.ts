@@ -281,4 +281,19 @@ describe('/log on / off / end', () => {
     const reply = await route(makeContext({ command: 'log', sub: 'list', channelId: 'CX' }, env.platform), env.deps);
     assert.ok(reply.content.includes('没有日志'));
   });
+
+  test('无局的场景日志：off 之后 on 也能继续（回归：activeLog 只看 on + 局指针）', async () => {
+    const env = makeEnv();
+    const logCtx = (sub: string, values: Record<string, string | number | boolean> = {}): InteractionContext =>
+      makeContext({ command: 'log', sub, channelId: 'C1', userId: 'U1', values }, env.platform);
+
+    const created = await route(logCtx('new', { name: '侧线' }), env.deps);
+    assert.ok(created.content.includes('场景日志'), created.content);
+    const off = await route(logCtx('off'), env.deps);
+    assert.ok(off.content.includes('已暂停日志「侧线」'), off.content);
+
+    const on = await route(logCtx('on'), env.deps);
+    assert.ok(on.content.includes('已继续记录日志「侧线」'), on.content);
+    assert.equal(env.store.listSceneLogs('C1', 'G1')[0]!.state, 'on');
+  });
 });

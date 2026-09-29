@@ -1167,5 +1167,38 @@
         "max_value": 10
       }
     ]
+  },
+  {
+    "name": "sn",
+    "description": "Sync your server nickname with your sheet while a log is recording",
+    "description_localizations": {
+      "zh-CN": "统计昵称：开 log 时把昵称改成 角色名 |DEX70 HP12/12 SAN70，log off 时改回"
+    },
+    "options": [
+      {
+        "type": 1,
+        "name": "on",
+        "description": "Enable: rename now if a log is recording, otherwise at the next log start",
+        "description_localizations": {
+          "zh-CN": "开启（当前正在记录则立即改名）"
+        }
+      },
+      {
+        "type": 1,
+        "name": "off",
+        "description": "Disable and restore the original nickname right now",
+        "description_localizations": {
+          "zh-CN": "关闭并立即改回原名"
+        }
+      },
+      {
+        "type": 1,
+        "name": "show",
+        "description": "Show the current state and the nickname that would be set",
+        "description_localizations": {
+          "zh-CN": "查看状态与将要设置的昵称"
+        }
+      }
+    ]
   }
 ]
