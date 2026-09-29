@@ -14,6 +14,7 @@ import type { CommandHandler, HandlerDeps, InteractionContext, ReplyPayload } fr
 import { stripStPrefix } from '../../coc/st.ts';
 import { askConfirm } from '../confirm.ts';
 import { adoptSheet, resolveSheet } from './context.ts';
+import { applyNicknameFor, sceneStillRecording, targetNicknameFor } from './nickSync.ts';
 import { clamp, fail, ok, optionString } from './options.ts';
 
 /** 与 `src/coc/st.ts` 的前缀判定保持一致：`clr`、`clr ` 都算，`clear` 不算。 */
@@ -85,5 +86,18 @@ export const stHandler: CommandHandler = async (ctx, deps) => {
   const lines: string[] = [];
   if (adopted.created) lines.push(`（当前场景没有角色卡，已自动新建并绑定「${sheet.name}」）`);
   lines.push(...(result.lines.length > 0 ? result.lines : [`已更新角色卡「${sheet.name}」。`]));
+
+  // `/sn`：正在记录时，属性一改就把统计昵称同步刷新（掉血 / 掉 SAN / 改敏捷立刻可见）
+  if (sceneStillRecording(ctx, deps)) {
+    const outcome = await applyNicknameFor(ctx, deps, ctx.userId);
+    const target = targetNicknameFor(deps.store, {
+      guildId: ctx.guildId,
+      channelId: ctx.channelId,
+      parentChannelId: ctx.parentChannelId,
+      userId: ctx.userId,
+    });
+    if (outcome === 'changed' && target) lines.push(`已更新统计昵称：\`${target}\``);
+    else if (outcome === 'failed') lines.push('⚠️ 统计昵称更新失败（多半缺「管理昵称」权限），属性已保存。');
+  }
   return ok(clamp(lines.join('\n')));
 };

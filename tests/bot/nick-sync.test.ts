@@ -8,12 +8,52 @@
  * Run: node tests/bot/nick-sync.test.ts
  */
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
+import { createPendingActions } from '../../src/bot/confirm.ts';
 import { NICK_LIMIT, maxHpOf, statNickname } from '../../src/bot/handlers/nickSync.ts';
 import { route } from '../../src/bot/router.ts';
+import { createCocRules } from '../../src/coc/index.ts';
+import type { HandlerDeps } from '../../src/contracts/bot.ts';
 import type { CharacterSheet } from '../../src/contracts/model.ts';
-import { makeContext, makeEnv, type TestEnv } from './fakes.ts';
+import type { BotStore } from '../../src/contracts/store.ts';
+import { createDiceEngine, createMathRng } from '../../src/dice/index.ts';
+import { createJsonStoreWithExtras } from '../../src/store/jsonStore.ts';
+import { FakePlatform, makeContext, makeEnv, type TestEnv } from './fakes.ts';
+
+const TMP_ROOT = fileURLToPath(new URL('../.tmp/', import.meta.url));
+
+/**
+ * `/st` 用例需要**真实**的 coc 引擎（`makeEnv()` 里的 coc 是 T1/T2 的 stub，只回"已处理 …"，
+ * 不会真的改属性），所以这一组用真实 jsonStore + 真实 `createCocRules`。
+ */
+interface LiveEnv {
+  deps: HandlerDeps;
+  store: BotStore;
+  platform: FakePlatform;
+}
+
+function makeLiveEnv(): LiveEnv {
+  mkdirSync(TMP_ROOT, { recursive: true });
+  const dir = mkdtempSync(join(TMP_ROOT, 'nick-sync-'));
+  const store = createJsonStoreWithExtras({ dir });
+  const dice = createDiceEngine();
+  const rng = createMathRng();
+  const platform = new FakePlatform();
+  const deps: HandlerDeps = {
+    store,
+    dice,
+    coc: createCocRules(dice, rng),
+    rng,
+    platform,
+    confirmations: createPendingActions(),
+    now: () => new Date('2026-01-05T21:30:00.000Z'),
+  };
+  return { deps, store, platform };
+}
 
 function sheet(name: string, attrs: Record<string, string>): CharacterSheet {
   return {
@@ -239,5 +279,78 @@ describe('生命周期：开 log 改名、log off / end 改回', () => {
     assert.match(started.content, /1 位失败/);
     assert.equal(env.platform.nicknames.get('G1:U2'), '奈亚 |DEX40 HP10/10 SAN50');
     assert.equal(env.platform.nicknames.get('G1:U1'), undefined);
+  });
+});
+
+describe('`/st` 改属性后自动刷新昵称（真实 coc 引擎）', () => {
+  const st = (env: LiveEnv, text: string, userId = 'U1'): ReturnType<typeof route> =>
+    route(
+      makeContext({ command: 'st', channelId: 'C1', userId, values: { text } }, env.platform),
+      env.deps,
+    );
+  const snOn = (env: LiveEnv, sub: string, userId = 'U1'): ReturnType<typeof route> =>
+    route(
+      makeContext({ command: 'sn', sub, channelId: 'C1', userId, values: {} }, env.platform),
+      env.deps,
+    );
+  const logCmd = (env: LiveEnv, sub: string): ReturnType<typeof route> =>
+    route(
+      makeContext({ command: 'log', sub, channelId: 'C1', userId: 'U1', values: { name: '第一天' } }, env.platform),
+      env.deps,
+    );
+  const liveBind = (env: LiveEnv, card: CharacterSheet = CARD, userId = 'U1'): void => {
+    env.store.putSheet(userId, card);
+    env.store.setBinding('scene', 'C1', userId, card.name);
+  };
+
+  test('正在记录时：/st 掉血后昵称里的 HP 立刻更新', async () => {
+    const env = makeLiveEnv();
+    liveBind(env);
+    await snOn(env, 'on');
+    await logCmd(env, 'new');
+    assert.equal(env.platform.nicknames.get('G1:U1'), '卡特 |DEX70 HP12/12 SAN70');
+
+    const hurt = await st(env, 'hp-5');
+    assert.match(hurt.content, /已更新统计昵称/);
+    assert.equal(env.platform.nicknames.get('G1:U1'), '卡特 |DEX70 HP7/12 SAN70');
+  });
+
+  test('改敏感属性：DEX 与 SAN 也会跟着变', async () => {
+    const env = makeLiveEnv();
+    liveBind(env);
+    await snOn(env, 'on');
+    await logCmd(env, 'new');
+
+    await st(env, '敏捷:50');
+    assert.equal(env.platform.nicknames.get('G1:U1'), '卡特 |DEX50 HP12/12 SAN70');
+    await st(env, '理智-10');
+    assert.equal(env.platform.nicknames.get('G1:U1'), '卡特 |DEX50 HP12/12 SAN60');
+  });
+
+  test('没开 /sn 或没有在记录：/st 照常生效但不动昵称', async () => {
+    const env = makeLiveEnv();
+    liveBind(env);
+    const plain = await st(env, 'hp-1');
+    assert.match(plain.content, /生命: 12->11/);
+    assert.equal(env.platform.nicknameCalls.length, 0);
+
+    await snOn(env, 'on'); // 开了 /sn，但本场景没有在记录的日志
+    const noLog = await st(env, 'hp-1');
+    assert.match(noLog.content, /生命: 11->10/);
+    assert.doesNotMatch(noLog.content, /统计昵称/);
+    assert.equal(env.platform.nicknameCalls.length, 0);
+  });
+
+  test('改名失败时 /st 仍然成功，只附一行警告', async () => {
+    const env = makeLiveEnv();
+    liveBind(env);
+    await snOn(env, 'on');
+    await logCmd(env, 'new');
+    env.platform.nicknameErrors.add('U1');
+
+    const hurt = await st(env, 'hp-3');
+    assert.match(hurt.content, /统计昵称更新失败/);
+    assert.notEqual(hurt.ephemeral, true);
+    assert.equal(env.store.getSheet('U1', '卡特')?.attrs['生命'], '9', '属性必须已落库');
   });
 });

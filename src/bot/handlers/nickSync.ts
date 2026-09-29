@@ -118,6 +118,50 @@ export async function applySceneNicknames(
   return outcome;
 }
 
+/**
+ * 单个成员：按当前场景的卡**刷新**昵称（`/st` 改完属性后调用）。
+ *
+ * 返回：
+ *   - `changed`  改好了
+ *   - `unchanged` 已经在目标值（幂等）
+ *   - `off`      该成员没开 `/sn`
+ *   - `nocard`   当前场景没有生效的角色卡
+ *   - `failed`   改名被 Discord 拒绝
+ */
+export type SingleNickResult = 'changed' | 'unchanged' | 'off' | 'nocard' | 'failed';
+
+export async function applyNicknameFor(
+  ctx: InteractionContext,
+  deps: HandlerDeps,
+  userId: string,
+): Promise<SingleNickResult> {
+  if (!ctx.guildId) return 'off';
+  const store = nickSyncStore(deps.store);
+  const state = store.getNickSync(ctx.guildId, userId);
+  if (!state?.enabled) return 'off';
+
+  const key: SceneKey = {
+    guildId: ctx.guildId,
+    channelId: ctx.channelId,
+    parentChannelId: ctx.parentChannelId,
+    userId,
+  };
+  const target = targetNicknameFor(deps.store, key);
+  if (!target) return 'nocard';
+
+  try {
+    const current = await deps.platform.memberNickname(ctx.guildId, userId);
+    if (current === target) return 'unchanged';
+    if (state.original === undefined) {
+      store.setNickSync(ctx.guildId, userId, { enabled: true, original: current });
+    }
+    await deps.platform.setMemberNickname(ctx.guildId, userId, target);
+    return 'changed';
+  } catch {
+    return 'failed';
+  }
+}
+
 /** log off / log end：把"我们改过名"的成员改回原名（开关保留）。 */
 export async function restoreSceneNicknames(
   ctx: InteractionContext,
