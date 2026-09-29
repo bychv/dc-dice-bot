@@ -188,6 +188,23 @@ describe('`/sn` 开关', () => {
     assert.equal(reply.ephemeral, true);
     assert.match(reply.content, /只能在服务器里使用/);
   });
+
+  test('改不回原名时不报错：直接说已关闭同步（服主 / 角色层位高于 bot）', async () => {
+    const env = makeEnv();
+    bindCard(env);
+    env.platform.nicknames.set('G1:U1', '老王');
+    await sn(env, 'on');
+    await runLog(env, 'new');
+    assert.equal(env.platform.nicknames.get('G1:U1'), '卡特 |DEX70 HP12/12 SAN70');
+
+    env.platform.nicknameErrors.add('U1'); // 之后所有改名都被 Discord 拒绝
+    const off = await sn(env, 'off');
+
+    assert.notEqual(off.ephemeral, true, '关闭不是失败回执');
+    assert.doesNotMatch(off.content, /失败|报错|Missing Permissions/);
+    assert.match(off.content, /已关闭统计昵称同步/);
+    assert.equal(env.store.getNickSync('G1', 'U1'), null, '开关必须清掉');
+  });
 });
 
 describe('生命周期：开 log 改名、log off / end 改回', () => {
@@ -279,6 +296,12 @@ describe('生命周期：开 log 改名、log off / end 改回', () => {
     assert.match(started.content, /1 位失败/);
     assert.equal(env.platform.nicknames.get('G1:U2'), '奈亚 |DEX40 HP10/10 SAN50');
     assert.equal(env.platform.nicknames.get('G1:U1'), undefined);
+    // 没改成就不该留下"还原点"，否则之后每次 log off 都会给这个成员白报一行失败
+    assert.equal(env.store.getNickSync('G1', 'U1')?.original, undefined);
+    assert.equal(env.store.getNickSync('G1', 'U1')?.enabled, true);
+
+    const off = await runLog(env, 'off');
+    assert.doesNotMatch(off.content, /失败/, off.content);
   });
 });
 

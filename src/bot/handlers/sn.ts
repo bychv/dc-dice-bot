@@ -71,8 +71,9 @@ async function snOff(ctx: InteractionContext, deps: HandlerDeps): Promise<ReplyP
     try {
       await deps.platform.setMemberNickname(guildId, ctx.userId, state.original);
       lines.push(state.original === null ? '已把昵称改回默认用户名。' : `已把昵称改回原名「${state.original}」。`);
-    } catch (error) {
-      return fail(`关闭失败：改回原名时 Discord 报错 —— ${error instanceof Error ? error.message : String(error)}`);
+    } catch {
+      // 改不回来（服务器所有者 / 角色层位高于 bot / 权限被收回）不算失败：
+      // 直接关掉同步就好，不要拿 Discord 的报错糊用户一脸。
     }
   }
   store.setNickSync(guildId, ctx.userId, null);

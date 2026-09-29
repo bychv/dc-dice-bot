@@ -111,6 +111,9 @@ export async function applySceneNicknames(
       await deps.platform.setMemberNickname(ctx.guildId, userId, target);
       outcome.changed += 1;
     } catch (error) {
+      // 改名没成功（服主 / 角色层位不足 / 缺权限）→ **撤回**刚记下的"原名"，
+      // 否则之后每次 log off 都会去"还原"一个我们从未改过的昵称，白报一行失败。
+      store.setNickSync(ctx.guildId, userId, { enabled: state.enabled, ...(state.original === undefined ? {} : { original: state.original }) });
       outcome.failed += 1;
       outcome.failures.push(`${userId}: ${messageOf(error)}`);
     }
@@ -158,6 +161,8 @@ export async function applyNicknameFor(
     await deps.platform.setMemberNickname(ctx.guildId, userId, target);
     return 'changed';
   } catch {
+    // 失败就撤回刚记下的"原名"（同 applySceneNicknames：没改成就不该留下还原点）
+    store.setNickSync(ctx.guildId, userId, { enabled: state.enabled, ...(state.original === undefined ? {} : { original: state.original }) });
     return 'failed';
   }
 }
