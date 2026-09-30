@@ -14,7 +14,7 @@ import type { CommandHandler, HandlerDeps, InteractionContext, ReplyPayload } fr
 import type { GameRecord, LogRecord } from '../../contracts/model.ts';
 import { activeLog, currentGame, findLogByName, scopedLogs } from './context.ts';
 import { fmtDateTime, fmtLogLine, fmtStamp, mentionChannel } from './format.ts';
-import { createLog, exportLogRecord, pauseAbandonedLogs } from './gameCore.ts';
+import { createLog, exportLogFile, exportLogRecord, pauseAbandonedLogs } from './gameCore.ts';
 import { clamp, fail, ok, optionString, subcommand } from './options.ts';
 import {
   applySceneNicknames,
@@ -121,28 +121,40 @@ async function logList(ctx: InteractionContext, deps: HandlerDeps): Promise<Repl
 }
 
 async function logOn(ctx: InteractionContext, deps: HandlerDeps): Promise<ReplyPayload> {
-  // 没有任何日志在记录时，恢复本场景**最近暂停**的一条。
-  // （`/log off` 的回执承诺了"可 `/log on` 继续"，而 `activeLog` 只看 state==='on' 和局指针，
-  //   无局的场景日志暂停后会两边都落空 → 这里兜底。）
+  // 没有日志在记录时，恢复本场景**最近的一条**（`off` 暂停的、或**已 `end` 结束的**）。
+  // （`activeLog` 只看 state==='on' 和局指针，无局的场景日志暂停后会两边都落空 → 这里兜底；
+  //   `end` 只是"导出结束"，不再是一道单向门：接着 `/log on` 就继续往同一条日志里记。）
   const log =
     activeLog(ctx, deps) ??
     scopedLogs(ctx, deps)
-      .filter((l) => l.state === 'off')
+      .filter((l) => l.state !== 'on')
       .sort((a, b) => (a.startedAt === b.startedAt ? 0 : a.startedAt < b.startedAt ? 1 : -1))[0] ??
     null;
   if (!log) return fail('本场景没有可继续的日志；用 `/log new` 开一条。');
-  if (log.state === 'ended') return fail(`日志「${log.name}」已结束，请用 \`/log new\` 开新日志。`);
 
+  const resumedEnded = log.state === 'ended';
   const others = scopedLogs(ctx, deps).filter((l) => l.state === 'on' && l.id !== log.id);
   for (const other of others) deps.store.putLog({ ...other, state: 'off' });
-  deps.store.putLog({ ...log, state: 'on' });
+  // 继续记录：endedAt 清掉（"还在记"与"有结束时间"不能同时成立），fileName 保留 → 再次 end 会覆盖导出同一条文件
+  deps.store.putLog({ ...log, state: 'on', endedAt: null });
 
   const game = currentGame(ctx, deps);
   if (game) {
     game.currentLogId = log.id;
     deps.store.putGame(game);
   }
-  const lines = [`已继续记录日志「${log.name}」。`];
+  const lines = [
+    resumedEnded
+      ? `已重新开启已结束的日志「${log.name}」，继续记录。`
+      : `已继续记录日志「${log.name}」。`,
+  ];
+  if (resumedEnded) {
+    lines.push(
+      log.fileName
+        ? `导出文件仍是 \`${log.fileName}\`；再次 \`/log end\` 会重新导出并覆盖它，中途想看就 \`/log export\`。`
+        : '本场景还有别的结束日志时，`/log export` 可随时导出当前内容。',
+    );
+  }
   if (others.length > 0) {
     lines.push(`为保持唯一性，已暂停：${others.map((l) => `「${l.name}」`).join('、')}`);
   }
@@ -211,6 +223,41 @@ async function logEnd(ctx: InteractionContext, deps: HandlerDeps): Promise<Reply
   return ok(`${header}${tail}`, [file]);
 }
 
+/**
+ * `/log export [name]` — **导出但不结束**：把日志当前内容写盘并交出去（配了 R2 就发链接），
+ * 状态、`currentLogId`、`endedAt` 一律不动，记录继续。
+ *
+ * 用途：长团中途想要一份快照/发给别人；已 `end` 过的日志也可以用它重新导出一次
+ * （`/log on` 续记之后尤其有用：不用真的再 `end` 一次就能拿到新内容）。
+ */
+async function logExport(ctx: InteractionContext, deps: HandlerDeps): Promise<ReplyPayload> {
+  const name = optionString(ctx, 'name')?.trim() || null;
+  const log = name ? findLogByName(ctx, deps, name) : activeLog(ctx, deps);
+  if (!log) {
+    return fail(
+      name
+        ? `当前上下文里找不到日志「${name}」。用 \`/log list\` 查看名称。`
+        : '当前没有可导出的日志；用 `name:` 指定历史日志，或先 `/log new`。',
+    );
+  }
+
+  const { file, log: exported } = exportLogFile(deps, log);
+  const stateLabel = log.state === 'on' ? '记录中' : log.state === 'off' ? '已暂停' : '已结束';
+  const header = `已导出日志「${exported.name}」（${stateLabel}）到 \`${exported.fileName}\`，日志状态不变。`;
+  if (file.data.length === 0) {
+    return ok(`${header}\n（当前没有任何内容，导出的文件是空的。）`);
+  }
+  if (deps.logUpload) {
+    const uploaded = await deps.logUpload.upload(file);
+    if (uploaded.ok) {
+      const expiry = uploaded.presigned ? '（链接有有效期，过期后请重新导出）' : '';
+      return ok(`${header}\n📎 下载：${uploaded.url}${expiry}`);
+    }
+    return ok(`${header}\n⚠️ 上传到对象存储失败，改用附件：${uploaded.error}`, [file]);
+  }
+  return ok(header, [file]);
+}
+
 export const logHandler: CommandHandler = async (ctx, deps) => {
   switch (subcommand(ctx)) {
     case 'new':
@@ -223,7 +270,9 @@ export const logHandler: CommandHandler = async (ctx, deps) => {
       return logOff(ctx, deps);
     case 'end':
       return logEnd(ctx, deps);
+    case 'export':
+      return logExport(ctx, deps);
     default:
-      return fail('未知的 `/log` 子命令，可用：new / list / on / off / end。');
+      return fail('未知的 `/log` 子命令，可用：new / list / on / off / end / export。');
   }
 };

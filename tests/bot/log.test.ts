@@ -149,7 +149,7 @@ describe('/log new', () => {
 });
 
 describe('/log on / off / end', () => {
-  test('off then on resumes the same log; an ended log cannot be resumed', async () => {
+  test('off then on resumes the same log; an ended log can be resumed too', async () => {
     const env = makeEnv();
     await route(startCtx(env, { name: '阿卡姆', keeper: 'KP1' }), env.deps);
     const scene = env.store.getGame('G1', '#1')!.sceneThreadId!;
@@ -163,10 +163,18 @@ describe('/log on / off / end', () => {
     await route(ctxFor('end'), env.deps);
     const ended = env.store.listLogs({ gameId: '#1', channelId: scene })[0];
     assert.equal(ended.state, 'ended');
+    assert.ok(ended.endedAt, '结束会写下 endedAt');
+    assert.ok(ended.fileName, '结束会写下导出文件名');
 
-    const refused = await route(ctxFor('on'), env.deps);
-    assert.equal(refused.ephemeral, true);
-    assert.ok(refused.content.includes('/log new'));
+    // 结束不是单向门：/log on 重新开启同一条日志继续记录
+    const resumed = await route(ctxFor('on'), env.deps);
+    assert.notEqual(resumed.ephemeral, true, resumed.content);
+    assert.match(resumed.content, /已重新开启已结束的日志「阿卡姆」/);
+    const again = env.store.listLogs({ gameId: '#1', channelId: scene })[0];
+    assert.equal(again.state, 'on');
+    assert.equal(again.endedAt, null, '续记时要清掉 endedAt');
+    assert.equal(again.fileName, ended.fileName, '沿用同一个导出文件（再次 end 覆盖它）');
+    assert.equal(again.id, ended.id, '还是同一条日志，不新建');
   });
 
   test('/log end name: exports a specific paused log and attaches the file', async () => {
@@ -280,6 +288,51 @@ describe('/log on / off / end', () => {
     const env = makeEnv();
     const reply = await route(makeContext({ command: 'log', sub: 'list', channelId: 'CX' }, env.platform), env.deps);
     assert.ok(reply.content.includes('没有日志'));
+  });
+
+  test('/log export：导出但不结束，状态不变，之后还能继续记', async () => {
+    const env = makeEnv();
+    const logCtx = (sub: string, values: Record<string, string | number | boolean> = {}): InteractionContext =>
+      makeContext({ command: 'log', sub, channelId: 'C1', userId: 'U1', values }, env.platform);
+
+    await route(logCtx('new', { name: '侧线' }), env.deps);
+    env.store.appendLogLine('C1', '甲(U1) 2026-01-01 00:00:00\n第一条内容\n\n');
+
+    const exported = await route(logCtx('export'), env.deps);
+    assert.notEqual(exported.ephemeral, true, exported.content);
+    assert.match(exported.content, /已导出日志「侧线」（记录中）/);
+    assert.match(exported.content, /日志状态不变/);
+    assert.equal(exported.files?.length, 1, '无对象存储时用附件交付');
+    assert.match(exported.files![0]!.data.toString('utf8'), /第一条内容/);
+
+    const log = env.store.listSceneLogs('C1', 'G1')[0]!;
+    assert.equal(log.state, 'on', '导出不改状态');
+    assert.equal(log.endedAt, null);
+    assert.ok(log.fileName, '顺带把导出文件名记下来');
+
+    // 继续记：再导出一次，文件里能看到新内容（同一条文件）
+    env.store.appendLogLine('C1', '甲(U1) 2026-01-01 00:05:00\n第二条内容\n\n');
+    const again = await route(logCtx('export'), env.deps);
+    assert.match(again.files![0]!.data.toString('utf8'), /第一条内容[\s\S]*第二条内容/);
+    assert.equal(again.files![0]!.name, exported.files![0]!.name, '沿用同一个导出文件');
+    assert.equal(env.store.listSceneLogs('C1', 'G1')[0]!.state, 'on');
+  });
+
+  test('/log export name: 可以导出已结束的日志（不改变它的状态）', async () => {
+    const env = makeEnv();
+    const logCtx = (sub: string, values: Record<string, string | number | boolean> = {}): InteractionContext =>
+      makeContext({ command: 'log', sub, channelId: 'C1', userId: 'U1', values }, env.platform);
+
+    await route(logCtx('new', { name: '侧线' }), env.deps);
+    env.store.appendLogLine('C1', '甲(U1) 2026-01-01 00:00:00\n内容\n\n');
+    await route(logCtx('new', { name: '第二条' }), env.deps).catch(() => undefined);
+    // 直接结束它，再用 export name: 取一份快照
+    await route(logCtx('end', { name: '侧线' }), env.deps);
+    assert.equal(env.store.listSceneLogs('C1', 'G1')[0]!.state, 'ended');
+
+    const exported = await route(logCtx('export', { name: '侧线' }), env.deps);
+    assert.match(exported.content, /（已结束）/);
+    assert.equal(env.store.listSceneLogs('C1', 'G1')[0]!.state, 'ended', 'export 不复活也不改动状态');
   });
 
   test('无局的场景日志：off 之后 on 也能继续（回归：activeLog 只看 on + 局指针）', async () => {

@@ -212,6 +212,23 @@ export function pauseAbandonedLogs(
   return paused;
 }
 
+/**
+ * 导出日志的**当前内容**但**不改状态**（`/log export` 用）。
+ *
+ * 文件名口径与 `exportLogRecord` 相同：已有 `fileName` 就沿用（重导出覆盖同一个文件），
+ * 否则按默认名 `<会话名>_<日志名>.txt` 落盘并对同服同名去重（加 `_<logId>`）。
+ */
+export function exportLogFile(
+  deps: HandlerDeps,
+  log: LogRecord,
+): { log: LogRecord; file: OutgoingFile } {
+  const path = deps.store.logFilePath(log);
+  const fileName = basename(path);
+  const exported: LogRecord = { ...log, fileName };
+  if (fileName !== log.fileName) deps.store.putLog(exported);
+  return { log: exported, file: { name: fileName, data: readFileSync(path) } };
+}
+
 /** `/log end` + `/game end`: end the log, export the file and hand back the attachment. */
 export function exportLogRecord(
   deps: HandlerDeps,

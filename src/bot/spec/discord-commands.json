@@ -1093,6 +1093,29 @@
             "autocomplete": true
           }
         ]
+      },
+      {
+        "type": 1,
+        "name": "export",
+        "description": "Export the current log now without ending it (still recording)",
+        "description_localizations": {
+          "zh-CN": "导出当前记录（不结束，继续记录；可随时取一份快照）"
+        },
+        "options": [
+          {
+            "type": 3,
+            "name": "name",
+            "description": "Log name; omit for the active log",
+            "name_localizations": {
+              "zh-CN": "日志名"
+            },
+            "description_localizations": {
+              "zh-CN": "日志名；省略则导出当前生效的日志"
+            },
+            "required": false,
+            "autocomplete": true
+          }
+        ]
       }
     ]
   },

@@ -191,12 +191,14 @@ describe('T4 · 23 条命令选项逐条核对（对照 §3-§12 表格）', () 
     assert.equal((command('setcoc').options ?? []).find((o) => o.name === 'clr')?.options, undefined);
   });
 
-  test('/log：new(name,game) / list / on / off / end(name)', () => {
-    assert.deepEqual(subcommandNames('log'), ['new', 'list', 'on', 'off', 'end']);
+  test('/log：new(name,game) / list / on / off / end(name) / export(name)', () => {
+    assert.deepEqual(subcommandNames('log'), ['new', 'list', 'on', 'off', 'end', 'export']);
     assert.equal(optionAt('log', ['new', 'name']).type, OPTION_TYPE.STRING);
     assert.notEqual(optionAt('log', ['new', 'name']).required, true);
     assert.equal(optionAt('log', ['new', 'game']).type, OPTION_TYPE.STRING);
     assert.notEqual(optionAt('log', ['end', 'name']).required, true);
+    assert.equal(optionAt('log', ['export', 'name']).type, OPTION_TYPE.STRING);
+    assert.notEqual(optionAt('log', ['export', 'name']).required, true);
     for (const bare of ['list', 'on', 'off']) {
       assert.equal((command('log').options ?? []).find((o) => o.name === bare)?.options, undefined, `/log ${bare} 无选项`);
     }

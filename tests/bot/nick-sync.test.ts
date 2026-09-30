@@ -377,3 +377,84 @@ describe('`/st` 改属性后自动刷新昵称（真实 coc 引擎）', () => {
     assert.equal(env.store.getSheet('U1', '卡特')?.attrs['生命'], '9', '属性必须已落库');
   });
 });
+
+describe('验收：记录中关闭 /sn 与权限不足', () => {
+  test('记录中 /sn off：昵称恢复原名、登记清掉、日志继续记录', async () => {
+    const env = makeEnv();
+    bindCard(env);
+    env.platform.nicknames.set('G1:U1', '老王');
+    await sn(env, 'on');
+    await runLog(env, 'new');
+    assert.equal(env.platform.nicknames.get('G1:U1'), '卡特 |DEX70 HP12/12 SAN70');
+
+    const off = await sn(env, 'off');
+    assert.match(off.content, /已把昵称改回原名「老王」/);
+    assert.match(off.content, /已关闭统计昵称同步/);
+    assert.equal(env.platform.nicknames.get('G1:U1'), '老王', 'id 必须恢复');
+    assert.equal(env.store.getNickSync('G1', 'U1'), null, '登记清掉');
+    assert.equal(env.store.listSceneLogs('C1', 'G1')[0]!.state, 'on', '日志不受影响，仍在记录');
+  });
+
+  test('关掉之后：log on / st 都不会再改回统计昵称', async () => {
+    const env = makeEnv();
+    bindCard(env);
+    env.platform.nicknames.set('G1:U1', '老王');
+    await sn(env, 'on');
+    await runLog(env, 'new');
+    await sn(env, 'off');
+    const callsAfterOff = env.platform.nicknameCalls.length;
+
+    await runLog(env, 'off');
+    await runLog(env, 'on'); // 重新开 log 也不会再动手
+    assert.equal(env.platform.nicknameCalls.length, callsAfterOff, '关闭后不应再有任何改名调用');
+    assert.equal(env.platform.nicknames.get('G1:U1'), '老王');
+  });
+
+  test('权限不足：/sn on 报错但保留开关与状态，不留下"还原点"', async () => {
+    const env = makeEnv();
+    bindCard(env);
+    await runLog(env, 'new');
+    env.platform.nicknameErrors.add('U1'); // 模拟缺「管理昵称」/ 服主
+
+    const on = await sn(env, 'on');
+    assert.equal(on.ephemeral, true, '只让发起者看到的失败提示');
+    assert.match(on.content, /改名失败/);
+    assert.equal(env.store.getNickSync('G1', 'U1')?.enabled, true, '开关保留：权限补齐后仍会生效');
+    assert.equal(env.store.getNickSync('G1', 'U1')?.original, undefined, '没改成就不留还原点');
+
+    // 权限补齐后（此处移除注入的错误）→ 下一次 log 生命周期就正常改名
+    env.platform.nicknameErrors.delete('U1');
+    await runLog(env, 'off');
+    const on2 = await runLog(env, 'on');
+    assert.match(on2.content, /已同步 1 位成员/);
+    assert.equal(env.platform.nicknames.get('G1:U1'), '卡特 |DEX70 HP12/12 SAN70');
+  });
+
+  test('权限不足：记录中 /sn off 静默关闭，日志与登记都处于一致状态', async () => {
+    const env = makeEnv();
+    bindCard(env);
+    env.platform.nicknames.set('G1:U1', '老王');
+    await sn(env, 'on');
+    await runLog(env, 'new');
+    env.platform.nicknameErrors.add('U1'); // 之后任何改名都被拒
+
+    const off = await sn(env, 'off');
+    assert.notEqual(off.ephemeral, true);
+    assert.match(off.content, /已关闭统计昵称同步/);
+    assert.doesNotMatch(off.content, /失败|报错|Permissions/);
+    assert.equal(env.store.getNickSync('G1', 'U1'), null);
+    assert.equal(env.store.listSceneLogs('C1', 'G1')[0]!.state, 'on');
+    assert.equal(env.platform.nicknames.get('G1:U1'), '卡特 |DEX70 HP12/12 SAN70', '改不动就保持现状，不当成错误');
+  });
+
+  test('权限不足：记录中 log off 不会白报失败（因为从没改成）', async () => {
+    const env = makeEnv();
+    bindCard(env);
+    await runLog(env, 'new');
+    env.platform.nicknameErrors.add('U1');
+    await sn(env, 'on');
+    const off = await runLog(env, 'off');
+    assert.doesNotMatch(off.content, /失败|还原/, off.content);
+    assert.equal(env.store.getNickSync('G1', 'U1')?.original, undefined);
+  });
+});
