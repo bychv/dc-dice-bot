@@ -3,7 +3,7 @@
  *
  * 1) manifest.ts（打包的 spec）与权威 docs/discord-commands.json 深度相等（自研比较器，
  *    键顺序无关、数组顺序有关）；打包副本与 docs 副本也深度相等。
- * 2) §2/§3-§12 的 21 条命令逐条核对子命令 / 选项名 / 类型 / choices / channel_types / min-max / required。
+ * 2) §2/§3-§12 的 23 条命令逐条核对子命令 / 选项名 / 类型 / choices / channel_types / min-max / required。
  * 3) manifest ↔ registry 一一对应（无缺失 / 无多余）。
  * 4) 依赖方向：handlers / registry / router 不得 import discord.js；adapter.ts 必须 import。
  *
@@ -80,10 +80,10 @@ describe('T4 · 命令清单与权威 JSON 一致性', () => {
     assert.equal(canonical(bundled), canonical(docs));
   });
 
-  test('恰好 21 条命令，名称/顺序与 §2 总览表一致且全为 ASCII 小写', () => {
+  test('恰好 23 条命令，名称/顺序与 §2 总览表一致且全为 ASCII 小写', () => {
     assert.deepEqual(
       COMMAND_NAMES,
-      ['help', 'rules', 'r', 'rh', 'rs', 'coc', 'game', 'pc', 'st', 'rc', 'ra', 'setcoc', 'sc', 'ti', 'li', 'en', 'log', 'nn', 'nnn', 'name', 'sn'],
+      ['help', 'rules', 'r', 'rh', 'rs', 'coc', 'game', 'pc', 'st', 'rc', 'ra', 'rcx', 'rax', 'setcoc', 'sc', 'ti', 'li', 'en', 'log', 'nn', 'nnn', 'name', 'sn'],
     );
     for (const name of COMMAND_NAMES) assert.match(name, /^[a-z]+$/, `命令名必须 ASCII 小写：${name}`);
   });
@@ -99,7 +99,7 @@ describe('T4 · 命令清单与权威 JSON 一致性', () => {
   });
 });
 
-describe('T4 · 21 条命令选项逐条核对（对照 §3-§12 表格）', () => {
+describe('T4 · 23 条命令选项逐条核对（对照 §3-§12 表格）', () => {
   test('/help：query STRING 选填', () => {
     const query = optionAt('help', ['query']);
     assert.equal(query.type, OPTION_TYPE.STRING);
@@ -230,12 +230,12 @@ describe('T4 · 21 条命令选项逐条核对（对照 §3-§12 表格）', () 
 });
 
 describe('T4 · manifest ↔ registry 交叉检查', () => {
-  test('21 条命令与 21 个 handler 一一对应（无缺失 / 无多余）', () => {
+  test('23 条命令与 21 个 handler 一一对应（无缺失 / 无多余）', () => {
     assert.deepEqual(missingHandlers(), [], 'manifest 有命令但 registry 没有 handler');
     assert.deepEqual(handlersWithoutCommand(), [], 'registry 有 handler 但 manifest 没有命令');
-    assert.equal(HANDLER_NAMES.length, 21);
+    assert.equal(HANDLER_NAMES.length, 23);
     assert.deepEqual([...HANDLER_NAMES].sort(), [...COMMAND_NAMES].sort());
-    assert.equal(Object.keys(createRegistry()).length, 21);
+    assert.equal(Object.keys(createRegistry()).length, 23);
   });
 
   test('每个 handler 都是函数且 registry 不共享可变状态', () => {

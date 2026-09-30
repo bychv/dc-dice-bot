@@ -26,8 +26,8 @@ describe('registry + router', () => {
   test('every documented command has exactly one handler', () => {
     assert.deepEqual(missingHandlers(), []);
     assert.deepEqual(handlersWithoutCommand(), []);
-    assert.equal(HANDLER_NAMES.length, 21);
-    assert.equal(COMMAND_NAMES.length, 21);
+    assert.equal(HANDLER_NAMES.length, 23);
+    assert.equal(COMMAND_NAMES.length, 23);
     assert.deepEqual([...HANDLER_NAMES].sort(), [...COMMAND_NAMES].sort());
   });
 

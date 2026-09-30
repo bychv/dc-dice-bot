@@ -779,6 +779,74 @@
     ]
   },
   {
+    "name": "rcx",
+    "description": "Proxy check: roll for another member using their sheet",
+    "description_localizations": {
+      "zh-CN": "代投检定：用被代投者的角色卡替他检定，回显他的角色卡名"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .rc/.ra argument line (same as /rc)",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "与 /rc 相同的整行原文，例如 力量 / 困难智力 99 / 3#p 手枪"
+        },
+        "required": true,
+        "autocomplete": true
+      },
+      {
+        "type": 6,
+        "name": "user",
+        "description": "Member to roll for (omit = yourself)",
+        "name_localizations": {
+          "zh-CN": "被代投者"
+        },
+        "description_localizations": {
+          "zh-CN": "被代投的成员；省略就是给自己投（等同 /rc）"
+        },
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "rax",
+    "description": "Proxy check (alias of /rcx)",
+    "description_localizations": {
+      "zh-CN": "代投检定（/rcx 的同义命令，解析器相同）"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .rc/.ra argument line (same as /rc)",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "与 /rc 相同的整行原文，例如 力量 / 困难智力 99 / 3#p 手枪"
+        },
+        "required": true,
+        "autocomplete": true
+      },
+      {
+        "type": 6,
+        "name": "user",
+        "description": "Member to roll for (omit = yourself)",
+        "name_localizations": {
+          "zh-CN": "被代投者"
+        },
+        "description_localizations": {
+          "zh-CN": "被代投的成员；省略就是给自己投（等同 /rc）"
+        },
+        "required": false
+      }
+    ]
+  },
+  {
     "name": "setcoc",
     "description": "Configure CoC house rules for the current session or channel",
     "description_localizations": {
