@@ -264,3 +264,120 @@ describe('/rh edge cases', () => {
     assert.equal([...env.platform.threads.values()].filter((t) => t.private).length, 0);
   });
 });
+
+describe('/rh 无局子区：回落到"正在记录中的局"的暗骰子区', () => {
+  /**
+   * 开一局（自动带暗骰子区 + 自动开日志）。
+   * 注意：`/game start` 会把**父频道**也算进本局场景，所以"没有局的子区"必须挂在**另一个父频道**下
+   * （父频道有局的子区会直接继承那个局，走 `game` 而不是 `borrowed` 分支）。
+   */
+  async function startGame(
+    env: TestEnv,
+    name: string,
+    channelId = 'C9',
+    keeper = 'KP1',
+  ): Promise<{ scene: string; hidden: string; id: string }> {
+    await route(
+      makeContext({ command: 'game', sub: 'start', channelId, channelName: '跑团', userId: keeper, values: { name, keeper } }, env.platform),
+      env.deps,
+    );
+    const game = env.store.listGames('G1').find((g) => g.name === name)!;
+    return { scene: game.sceneThreadId!, hidden: game.hiddenThreadId!, id: game.id };
+  }
+
+  /** 一个父频道 C1 下、没有绑定任何局的子区 T20。 */
+  function orphanThread(env: TestEnv, id = 'T20'): string {
+    env.platform.threads.set(id, { id, parentId: 'C1', name: '临时小场景', private: false });
+    return id;
+  }
+
+  const rhIn = (env: TestEnv, channelId: string) =>
+    route(
+      makeContext({ command: 'rh', channelId, parentChannelId: 'C1', userId: 'U2', displayName: '乙', values: { text: '心理学' } }, env.platform),
+      env.deps,
+    );
+
+  test('没有局的子区：投到正在进行（日志记录中）的局的暗骰子区，不再另建', async () => {
+    const env = makeEnv();
+    const game = await startGame(env, '阿卡姆'); // 开在 C9
+    const thread = orphanThread(env);
+
+    const reply = await rhIn(env, thread);
+
+    assert.equal(lastMessage(env)?.channelId, game.hidden, '应投到该局的暗骰子区');
+    assert.equal(reply.ephemeral, true);
+    assert.match(reply.content, /本场景没有开局/);
+    assert.match(reply.content, new RegExp(`${game.id} 阿卡姆`));
+    // 没有为这个子区另建私密子区，也没有登记到它身上
+    assert.equal(env.store.getRegisteredThread(thread), null);
+    assert.equal(
+      [...env.platform.threads.values()].filter((t) => t.private).length,
+      1,
+      '只应有该局自带的那一个私密子区',
+    );
+  });
+
+  test('局日志已 off 时不借用：回到自动创建', async () => {
+    const env = makeEnv();
+    const game = await startGame(env, '阿卡姆');
+    await route(
+      makeContext({ command: 'log', sub: 'off', channelId: game.scene, parentChannelId: 'C9', userId: 'KP1' }, env.platform),
+      env.deps,
+    );
+    const thread = orphanThread(env);
+
+    const reply = await rhIn(env, thread);
+    assert.notEqual(lastMessage(env)?.channelId, game.hidden, '日志不在记录中 → 不借用');
+    assert.match(reply.content, /自动创建并复用/);
+    assert.equal([...env.platform.threads.values()].filter((t) => t.private).length, 2, '局自带 1 个 + 本场景新建 1 个');
+  });
+
+  test('局已结束（/game end）时不借用', async () => {
+    const env = makeEnv();
+    const game = await startGame(env, '阿卡姆');
+    await route(
+      makeContext({ command: 'game', sub: 'end', channelId: game.scene, parentChannelId: 'C9', userId: 'KP1', values: {} }, env.platform),
+      env.deps,
+    );
+    const thread = orphanThread(env);
+
+    await rhIn(env, thread);
+    assert.equal(env.store.getGame('G1', game.id)?.status, 'ended');
+    assert.notEqual(lastMessage(env)?.channelId, game.hidden, '结束的局不作为兜底来源');
+  });
+
+  test('多个候选（都不同父频道）时取最近有记录的局', async () => {
+    const env = makeEnv();
+    const older = await startGame(env, '旧团', 'C8', 'KP8');
+    await route(makeContext({ command: 'log', sub: 'off', channelId: older.scene, parentChannelId: 'C8', userId: 'KP8' }, env.platform), env.deps);
+    const active = await startGame(env, '新团', 'C9', 'KP9'); // 后开：日志新
+    const thread = orphanThread(env);
+
+    await rhIn(env, thread);
+    assert.equal(lastMessage(env)?.channelId, active.hidden, '取最近有记录的局');
+  });
+
+  test('借用的目标失效时：清掉该局的登记并回落', async () => {
+    const env = makeEnv();
+    const game = await startGame(env, '阿卡姆');
+    env.platform.threads.delete(game.hidden); // 私密子区被删 / bot 被移出
+    const thread = orphanThread(env);
+
+    const reply = await rhIn(env, thread);
+    assert.equal(env.store.getGame('G1', game.id)?.hiddenThreadId, null, '失效来源要从局记录里清掉');
+    assert.match(reply.content, /已失效/);
+    assert.match(reply.content, /自动创建并复用/, '继续回落到自动子区');
+  });
+
+  test('场景级登记仍优先于"借来的"暗骰子区（显式选择不被隐式规则盖掉）', async () => {
+    const env = makeEnv();
+    const game = await startGame(env, '阿卡姆');
+    const thread = orphanThread(env);
+    env.platform.threads.set('T21', { id: 'T21', parentId: 'C1', name: '本场景专用暗骰区', private: true });
+    env.store.setRegisteredThread(thread, 'T21');
+
+    await rhIn(env, thread);
+    assert.equal(lastMessage(env)?.channelId, 'T21', '本场景登记的暗骰区优先');
+    assert.notEqual(lastMessage(env)?.channelId, game.hidden);
+  });
+});
