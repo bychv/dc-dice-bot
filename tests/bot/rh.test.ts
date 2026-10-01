@@ -317,7 +317,7 @@ describe('/rh 无局子区：回落到"正在记录中的局"的暗骰子区', (
     );
   });
 
-  test('局日志已 off 时不借用：回到自动创建', async () => {
+  test('日志暂停（off）也照样借用：判据只看局是否 active + 最近开局', async () => {
     const env = makeEnv();
     const game = await startGame(env, '阿卡姆');
     await route(
@@ -327,9 +327,26 @@ describe('/rh 无局子区：回落到"正在记录中的局"的暗骰子区', (
     const thread = orphanThread(env);
 
     const reply = await rhIn(env, thread);
-    assert.notEqual(lastMessage(env)?.channelId, game.hidden, '日志不在记录中 → 不借用');
-    assert.match(reply.content, /自动创建并复用/);
-    assert.equal([...env.platform.threads.values()].filter((t) => t.private).length, 2, '局自带 1 个 + 本场景新建 1 个');
+    assert.equal(lastMessage(env)?.channelId, game.hidden, '日志 off 只说明这个场景暂停了，不代表团不在跑');
+    assert.equal(
+      [...env.platform.threads.values()].filter((t) => t.private).length,
+      1,
+      '仍然不另建私密子区',
+    );
+  });
+
+  test('子区没有自己的局时：用"最近开局的局"覆盖父频道指针（本次改动的核心）', async () => {
+    const env = makeEnv();
+    const oldGame = await startGame(env, '旧团', 'C1'); // 开在父频道 C1 → C1 的指针指向它
+    const newGame = await startGame(env, '新团', 'C9'); // 之后新开的团
+    const thread = orphanThread(env); // C1 下的子区：会继承 C1 的指针（旧团）
+
+    assert.equal(env.store.getSceneGame('C1'), oldGame.id, '父频道指针确实还停在旧团上');
+
+    const reply = await rhIn(env, thread);
+    assert.equal(lastMessage(env)?.channelId, newGame.hidden, '应覆盖继承，用最近开局的新团');
+    assert.match(reply.content, /最近开局的局/);
+    assert.match(reply.content, new RegExp(`${newGame.id} 新团`));
   });
 
   test('局已结束（/game end）时不借用', async () => {

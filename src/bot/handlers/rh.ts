@@ -49,41 +49,57 @@ function autoThreadKey(sceneId: string): string {
 }
 
 /**
- * **无局场景的兜底来源**（docs §4.2 增补）：本服里「**正在进行**（active）且**日志正在记录**（有 `on` 日志）」
- * 的局的暗骰子区。
+ * 当前场景**自己**绑定的局（**不含**父频道继承）：
+ *   1. 场景指针（`/game start`/`switch` 写的那张表）；
+ *   2. 这个频道/子区本身就是某局的**主场景子区**或**暗骰子区**（反查，防止指针被改走导致张冠李戴）。
  *
- * 为什么要这条：`/game start` 已经在父频道下建好了本团的私密暗骰区；此时某个子区**没有开局**
- * （比如临时拉的一个小场景子区）时，`/rh` 不该再给这个子区单独建一个 `暗骰 · <场景名>`，
- * 而应直接投到本团那个暗骰区，让 KP 在一个地方看所有暗骰。
- *
- * 多个候选时排序：**同父频道**的局优先（子区属于哪个频道的团就用哪个团），其次看**最近有记录的**局。
+ * 为什么 `/rh` 要区分"自己的局"与"继承来的局"：开局一般在**单独子区**，几个局又常共用同一个父频道
+ * （父频道指针只会指向其中某一个，且可能是很久以前的测试局）。若子区自己没有绑定局，
+ * 按下面的策略改用"**最近开局的 active 局**"，而不是照着父频道指针走。
  */
-function recordingGameHiddenThread(
-  ctx: InteractionContext,
-  deps: HandlerDeps,
-): { id: string; game: GameRecord } | null {
+function ownGame(ctx: InteractionContext, deps: HandlerDeps): GameRecord | null {
+  if (!ctx.guildId) return null;
+  const direct = deps.store.getSceneGame(ctx.channelId);
+  if (direct) {
+    const game = deps.store.getGame(ctx.guildId, direct);
+    if (game && game.status === 'active') return game;
+  }
+  return (
+    deps.store
+      .listGames(ctx.guildId)
+      .find(
+        (candidate) =>
+          candidate.status === 'active' &&
+          (candidate.sceneThreadId === ctx.channelId || candidate.hiddenThreadId === ctx.channelId),
+      ) ?? null
+  );
+}
+
+/**
+ * **最近开局的 active 局**的暗骰子区（docs §4.2 增补）。
+ *
+ * 判据只看"局"本身：`status === 'active'`、有暗骰子区、`startedAt` 最新（**不看日志开关状态**——
+ * 日志中途 `/log off` 是常事，不代表这个团不在跑）。多个局共用父频道时，靠它挑出"现在在打的团"。
+ */
+/** 局的创建顺序（`#12` > `#5`）：`startedAt` 相同时（时钟被冻结 / 同一秒连开两局）用它排序。 */
+function gameNumber(game: GameRecord): number {
+  const parsed = Number(game.id.replace(/^#/, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** `a` 是否比 `b` 更晚开局。 */
+function isNewerGame(a: GameRecord, b: GameRecord): boolean {
+  if (a.startedAt !== b.startedAt) return a.startedAt > b.startedAt;
+  return gameNumber(a) > gameNumber(b);
+}
+
+function newestActiveGame(ctx: InteractionContext, deps: HandlerDeps): GameRecord | null {
   if (!ctx.guildId) return null;
   const candidates = deps.store
     .listGames(ctx.guildId)
-    .filter((candidate) => candidate.status === 'active' && candidate.hiddenThreadId)
-    .map((candidate) => {
-      const latest = deps.store
-        .listLogs({ gameId: candidate.id, channelId: '', guildId: ctx.guildId ?? undefined })
-        .filter((log) => log.state === 'on')
-        .reduce((max, log) => (log.startedAt > max ? log.startedAt : max), '');
-      return { game: candidate, hidden: candidate.hiddenThreadId as string, latest };
-    })
-    .filter((candidate) => candidate.latest.length > 0);
+    .filter((candidate) => candidate.status === 'active' && candidate.hiddenThreadId);
   if (candidates.length === 0) return null;
-
-  candidates.sort((a, b) => {
-    const affinityA = a.game.parentChannelId === ctx.parentChannelId ? 1 : 0;
-    const affinityB = b.game.parentChannelId === ctx.parentChannelId ? 1 : 0;
-    if (affinityA !== affinityB) return affinityB - affinityA;
-    if (a.latest !== b.latest) return a.latest < b.latest ? 1 : -1;
-    return a.game.id < b.game.id ? -1 : 1;
-  });
-  return { id: candidates[0]!.hidden, game: candidates[0]!.game };
+  return candidates.reduce((newest, candidate) => (isNewerGame(candidate, newest) ? candidate : newest));
 }
 
 export const rhHandler: CommandHandler = async (ctx, deps) => {
@@ -91,7 +107,22 @@ export const rhHandler: CommandHandler = async (ctx, deps) => {
   const keeperId = optionUser(ctx, 'keeper');
   const explicitThread = optionChannel(ctx, 'thread');
   const reset = optionBoolean(ctx, 'reset') ?? false;
-  const game = currentGame(ctx, deps);
+
+  /**
+   * 目标局（docs §4.2 增补，2026-10-01 定稿）：
+   *   1. 本场景**自己**绑定的局（场景指针 / 本身就是某局的主场景子区或暗骰子区）→ 直接用，不被覆盖；
+   *   2. 否则用**最近开局的 active 局**——**覆盖**"子区继承父频道指针"那条老规则
+   *      （几个局共用一个父频道时，父频道指针往往还停在很久以前的某个局上）；
+   *   3. 都没有才退回父频道继承来的局。
+   */
+  const own = ownGame(ctx, deps);
+  const newest = newestActiveGame(ctx, deps);
+  const inherited = currentGame(ctx, deps);
+  const game = own ?? newest ?? inherited;
+  /** 是否属于"用了最近开局的局（而不是父频道继承来的）"这条路（回执里要说明）。 */
+  const borrowedFromNewest = !own && newest !== null && newest.id !== inherited?.id;
+  /** 非"自己的局"时，最终用来投递的局（最近开局的，其次父频道继承来的）。 */
+  const fallbackGame = own ? null : newest ?? inherited;
 
   // 场景是子区时，父频道才是暗骰子区的落点（子区不能内嵌子区）
   const parentId = ctx.parentChannelId ?? ctx.channelId;
@@ -123,45 +154,46 @@ export const rhHandler: CommandHandler = async (ctx, deps) => {
   // 给出 thread 即持久化登记为本场景默认
   if (explicitThread) deps.store.setRegisteredThread(ctx.channelId, explicitThread);
 
-  // 投递优先级：显式 thread > 本局暗骰子区 > 场景级登记 > **正在记录日志的局的暗骰子区**（无局兜底）
+  // 投递优先级：显式 thread > 本局暗骰子区（可能是"最近开局的局"，见上）> 场景级登记
   // > 自动子区缓存 > 新建。失效来源（子区被删除 / Bot 被移出）会清理该来源并继续回落（docs §16.11）。
-  const borrowed = game ? null : recordingGameHiddenThread(ctx, deps);
-  const candidates: Array<{ id: string; source: 'explicit' | 'game' | 'scene' | 'borrowed' | 'auto' }> = [];
+  const candidates: Array<{ id: string; source: 'explicit' | 'game' | 'scene' | 'auto'; owner?: GameRecord }> = [];
   if (explicitThread) {
     candidates.push({ id: explicitThread, source: 'explicit' });
   } else {
-    if (game?.hiddenThreadId) candidates.push({ id: game.hiddenThreadId, source: 'game' });
+    // ① 本场景**自己**绑的局（场景指针 / 本身就是该局的主场景子区或暗骰子区）
+    if (own?.hiddenThreadId) candidates.push({ id: own.hiddenThreadId, source: 'game', owner: own });
+    // ② 场景级登记（`/rh thread:` 显式指定过）——显式选择优先于下面的隐式规则
     const sceneRegistered = deps.store.getRegisteredThread(ctx.channelId);
     if (sceneRegistered) candidates.push({ id: sceneRegistered, source: 'scene' });
-    if (borrowed) candidates.push({ id: borrowed.id, source: 'borrowed' });
+    // ③ 没有自己的局 → 最近开局的 active 局（覆盖"子区继承父频道指针"那条老规则）
+    if (fallbackGame?.hiddenThreadId) {
+      candidates.push({ id: fallbackGame.hiddenThreadId, source: 'game', owner: fallbackGame });
+    }
     const cachedAuto = deps.store.getRegisteredThread(autoKey);
     if (cachedAuto) candidates.push({ id: cachedAuto, source: 'auto' });
   }
 
   const invalidated: string[] = [];
   let target: string | null = null;
-  /** 最终投递目标是不是"借"了别的局的暗骰子区（用于回执里说明）。 */
-  let borrowedUsed = false;
+  /** 最终用的暗骰子区是不是"某个局的"（回执里说明，免得以为投错团）。 */
+  let usedGameHidden = false;
   for (const candidate of candidates) {
     const parent = await deps.platform.threadParent(candidate.id);
     if (parent) {
       target = candidate.id;
-      borrowedUsed = candidate.source === 'borrowed';
+      usedGameHidden = candidate.source === 'game';
       break;
     }
     if (candidate.source === 'explicit') {
       // 显式指定绝不静默改投
       return fail(`目标 ${mentionChannel(candidate.id)} 不是子区（Thread），暗骰不会静默改投到别处。`);
     }
-    if (candidate.source === 'game' && game) {
-      game.hiddenThreadId = null;
-      deps.store.putGame(game);
-      invalidated.push(`本局暗骰子区 ${mentionChannel(candidate.id)} 已失效`);
-    } else if (candidate.source === 'borrowed' && borrowed) {
-      const owner = deps.store.getGame(borrowed.game.guildId, borrowed.game.id) ?? borrowed.game;
-      owner.hiddenThreadId = null;
-      deps.store.putGame(owner);
-      invalidated.push(`局 ${owner.id} 的暗骰子区 ${mentionChannel(candidate.id)} 已失效`);
+    if (candidate.source === 'game' && candidate.owner) {
+      candidate.owner.hiddenThreadId = null;
+      deps.store.putGame(candidate.owner);
+      invalidated.push(
+        `局 ${candidate.owner.id} ${candidate.owner.name} 的暗骰子区 ${mentionChannel(candidate.id)} 已失效`,
+      );
     } else if (candidate.source === 'scene') {
       deps.store.setRegisteredThread(ctx.channelId, null);
       invalidated.push(`场景登记的暗骰子区 ${mentionChannel(candidate.id)} 已失效`);
@@ -248,15 +280,15 @@ export const rhHandler: CommandHandler = async (ctx, deps) => {
       : `✅ 暗骰已投递到 ${mentionChannel(target)}（私密子区，仅本局 KP ${mentionUser(
           designated,
         )} 可见；频道内未发任何提示）。`,
-    borrowedUsed && borrowed
-      ? `本场景没有开局，已按"正在记录中的局"默认投到 ${borrowed.game.id} ${borrowed.game.name} 的暗骰子区（可用 \`/rh thread:<子区>\` 为本场景单独指定）。`
+    borrowedFromNewest && usedGameHidden && game
+      ? `本场景没有开局，已按**最近开局的局**默认投到 ${game.id} ${game.name} 的暗骰子区（可用 \`/rh thread:<子区>\` 为本场景单独指定）。`
       : '',
     ...invalidated,
     insider ? '' : '你的结果只在本条回执里可见（其他人看不到）：',
     rawBody,
     keeperIgnored,
     autoCreated ? '该私密子区已自动创建并复用，之后 `/rh` 会继续投到这里。' : '',
-    explicitThread || (!game?.hiddenThreadId && !autoCreated && !borrowedUsed)
+    explicitThread || (!game?.hiddenThreadId && !autoCreated && !(borrowedFromNewest && usedGameHidden))
       ? '注意：若该子区是公开子区，其可见范围等于父频道——父频道对全服开放时不具备保密性。'
       : '',
   ].filter((line) => line.length > 0);
