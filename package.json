@@ -18,7 +18,11 @@
     "migrate-logs": "node --env-file-if-exists=.env scripts/migrate-log-names.ts",
     "start": "node --env-file-if-exists=.env src/bot/main.ts",
     "info": "node --env-file-if-exists=.env scripts/discord-info.ts",
-    "perms": "node --env-file-if-exists=.env scripts/discord-perms.ts"
+    "perms": "node --env-file-if-exists=.env scripts/discord-perms.ts",
+    "verify-agent-note-classification": "node scripts/verify-agent-note-classification.ts",
+    "verify-agent-note-format": "node scripts/verify-agent-note-format.ts",
+    "verify-archived-agent-notes": "node scripts/verify-archived-agent-notes.ts",
+    "agent-notes:check": "npm run verify-agent-note-classification && npm run verify-agent-note-format && npm run verify-archived-agent-notes"
   },
   "dependencies": {
     "discord.js": "^14.27.0",

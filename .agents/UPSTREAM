@@ -1,0 +1,9 @@
+# Agent Notes 上游来源
+
+- 仓库：https://github.com/deshark42/agent-notes
+- 抄入的 commit：`bd347ecfaea1a6ff1746972038a95bc984a2eba7`（committed 2026-10-04T01:38:25+08:00）
+- 抄入日期：2026-10-11（先落在工作区根目录，同日移入本仓库 `bot/`）
+- 抄入范围（原样，未改内容）：`AGENTS.md`、`.agents/`（notes 契约 + archive-agent-notes skill）、`scripts/agent-note-tree.ts`、`scripts/archived-agent-notes.ts`、`scripts/verify-agent-note-*.ts`；npm 脚本入口并入本仓库 `package.json`。
+- 本地追加：`AGENTS.md` 末尾的「本仓库」一节。
+
+升级：重新 clone 上游，覆盖上述位置即可（本地追加部分与本文件保留）。
