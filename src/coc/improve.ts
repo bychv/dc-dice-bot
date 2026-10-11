@@ -1,7 +1,7 @@
 /**
  * `/en` 成长检定（整行原文解析）。
  *
- * 依据 docs/Discord_CoC_Command_Set.md §9.3 与 ref/Dice/Dice/DiceEvent.cpp `pref2 == "en"`
+ * 依据 docs/Discord_CoC_Command_Set.md §9.4 与 ref/Dice/Dice/DiceEvent.cpp `pref2 == "en"`
  * （第 3097-3178 行）：
  * - `技能名 [技能值] [成长表达式] [理由]`；
  * - 技能值省略时读卡，缺卡可用 `valueOverride`；

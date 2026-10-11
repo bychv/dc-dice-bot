@@ -955,6 +955,40 @@
     ]
   },
   {
+    "name": "scx",
+    "description": "Proxy sanity check: roll CoC 7e SAN check for another member",
+    "description_localizations": {
+      "zh-CN": "代骰理智检定：用被代骰者的角色卡掷 SAN，回显他的角色卡名（理智扣在他卡上）"
+    },
+    "options": [
+      {
+        "type": 3,
+        "name": "text",
+        "description": "Raw .sc argument line, e.g. 0/1 70 or 1d10/1d100 直面外神",
+        "name_localizations": {
+          "zh-CN": "原文"
+        },
+        "description_localizations": {
+          "zh-CN": "整行 .sc 原文，例如 0/1 70 / 1d10/1d100 直面外神；san 已录入时可省略数字"
+        },
+        "required": true,
+        "autocomplete": true
+      },
+      {
+        "type": 6,
+        "name": "user",
+        "description": "Member to roll for (omit = yourself)",
+        "name_localizations": {
+          "zh-CN": "被代骰者"
+        },
+        "description_localizations": {
+          "zh-CN": "被代骰的成员；省略就是给自己骰（等同 /sc）"
+        },
+        "required": false
+      }
+    ]
+  },
+  {
     "name": "ti",
     "description": "Temporary insanity symptom",
     "description_localizations": {

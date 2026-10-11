@@ -151,3 +151,93 @@ describe('真实引擎：数值确实取自被代投者的卡', () => {
     assert.match(theirs.content, /（由 <@U1> 代投）/);
   });
 });
+
+describe('/scx 代骰：理智扣在被代骰者的卡上', () => {
+  function makeLiveEnv(): { deps: HandlerDeps; store: ReturnType<typeof createJsonStoreWithExtras>; platform: FakePlatform } {
+    mkdirSync(TMP_ROOT, { recursive: true });
+    const dir = mkdtempSync(join(TMP_ROOT, 'scx-'));
+    const store = createJsonStoreWithExtras({ dir });
+    const dice = createDiceEngine();
+    const rng = new FixedRng([50, 4]); // 检定骰 50、损失骰 4
+    const platform = new FakePlatform();
+    const deps: HandlerDeps = {
+      store,
+      dice,
+      coc: createCocRules(dice, rng),
+      rng,
+      platform,
+      confirmations: createPendingActions(),
+      now: () => new Date('2026-01-05T21:30:00.000Z'),
+    };
+    return { deps, store, platform };
+  }
+
+  const san = (store: { getSheet: (u: string, n: string) => CharacterSheet | null }, userId: string, name: string): number =>
+    Number(store.getSheet(userId, name)?.attrs['理智'] ?? NaN);
+
+  test('用被代骰者的卡算，理智写回他的卡，发起者的卡不变', async () => {
+    const env = makeLiveEnv();
+    env.store.putSheet('U1', MINE);
+    env.store.setBinding('scene', 'C1', 'U1', MINE.name);
+    // 理智检定要求卡上有理智值（否则引擎会要求指令里给出）
+    const theirs = { ...THEIRS, attrs: { ...THEIRS.attrs, 理智: '60' } };
+    env.store.putSheet('U2', theirs);
+    env.store.setBinding('scene', 'C1', 'U2', theirs.name);
+
+    const beforeMine = san(env.store, 'U1', MINE.name);
+    const beforeTheirs = san(env.store, 'U2', theirs.name);
+
+    const reply = await route(
+      makeContext({ command: 'scx', channelId: 'C1', userId: 'U1', values: { text: '1/1D6', user: 'U2' } }, env.platform),
+      env.deps,
+    );
+
+    assert.notEqual(reply.ephemeral, true, reply.content);
+    assert.match(reply.content, /^【二宫友梨】/, reply.content);
+    assert.match(reply.content, /（由 <@U1> 代骰）/);
+    assert.ok(san(env.store, 'U2', THEIRS.name) < beforeTheirs, '理智必须扣在被代骰者卡上');
+    assert.equal(san(env.store, 'U1', MINE.name), beforeMine, '发起者的卡必须原封不动');
+  });
+
+  test('省略 user 等同 /sc：以自己卡名开头，无代骰行', async () => {
+    const env = makeLiveEnv();
+    env.store.putSheet('U1', MINE);
+    env.store.setBinding('scene', 'C1', 'U1', MINE.name);
+
+    const reply = await route(
+      makeContext({ command: 'scx', channelId: 'C1', userId: 'U1', values: { text: '1/1D6' } }, env.platform),
+      env.deps,
+    );
+    assert.match(reply.content, /^【卡特】/, reply.content);
+    assert.doesNotMatch(reply.content, /代骰/);
+  });
+
+  test('被代骰者没有卡时用 @他 兜底', async () => {
+    const env = makeLiveEnv();
+    const reply = await route(
+      makeContext({ command: 'scx', channelId: 'C1', userId: 'U1', values: { text: '0/1 70', user: 'U9' } }, env.platform),
+      env.deps,
+    );
+    assert.match(reply.content, /^【<@U9>】/, reply.content);
+    assert.match(reply.content, /（由 <@U1> 代骰）/);
+  });
+
+  test('开了 /sn 且正在记录：代骰后昵称里的 SAN 同步刷新', async () => {
+    const env = makeLiveEnv();
+    env.store.putSheet('U2', { ...THEIRS, attrs: { 力量: '30', 敏捷: '45', 体质: '50', 体型: '70', 理智: '70' } });
+    env.store.setBinding('scene', 'C1', 'U2', THEIRS.name);
+    env.platform.nicknames.set('G1:U2', '老王');
+    const snOn = (sub: string, userId: string) =>
+      route(makeContext({ command: 'sn', sub, channelId: 'C1', userId, values: {} }, env.platform), env.deps);
+    await snOn('on', 'U2');
+    await route(makeContext({ command: 'log', sub: 'new', channelId: 'C1', userId: 'U2', values: { name: '第一天' } }, env.platform), env.deps);
+    assert.match(env.platform.nicknames.get('G1:U2') ?? '', /SAN70/);
+
+    const reply = await route(
+      makeContext({ command: 'scx', channelId: 'C1', userId: 'KP', values: { text: '1/1D6', user: 'U2' } }, env.platform),
+      env.deps,
+    );
+    assert.match(reply.content, /已更新统计昵称/);
+    assert.doesNotMatch(env.platform.nicknames.get('G1:U2') ?? '', /SAN70/, '昵称里的 SAN 必须跟着掉');
+  });
+});

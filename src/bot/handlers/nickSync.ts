@@ -201,6 +201,32 @@ export function sceneStillRecording(ctx: InteractionContext, deps: HandlerDeps):
     .some((log) => log.state === 'on');
 }
 
+/**
+ * 属性类命令（`/st`、`/sc`、`/scx`）改完卡面后的**统计昵称刷新**，返回回执里追加的一行（无变化返回空串）。
+ *
+ * 卡面一变（掉血 / 掉 SAN / 改敏捷）昵称里的 `HP`/`SAN`/`DEX` 就过期了，所以正在记录时立刻重算；
+ * 没开 `/sn`、没有卡、或本场景没在记录时静默返回。改名失败也只提示一行，**绝不影响属性写入**。
+ */
+export async function refreshStatNicknameNote(
+  ctx: InteractionContext,
+  deps: HandlerDeps,
+  userId: string,
+): Promise<string> {
+  if (!sceneStillRecording(ctx, deps)) return '';
+  const outcome = await applyNicknameFor(ctx, deps, userId);
+  if (outcome === 'changed') {
+    const target = targetNicknameFor(deps.store, {
+      guildId: ctx.guildId,
+      channelId: ctx.channelId,
+      parentChannelId: ctx.parentChannelId,
+      userId,
+    });
+    if (target) return `已更新统计昵称：\`${target}\``;
+  }
+  if (outcome === 'failed') return '⚠️ 统计昵称更新失败（多半缺「管理昵称」权限），属性已保存。';
+  return '';
+}
+
 /** 回执里附带的一行说明（没有变化时返回空串）。 */
 export function describeOutcome(outcome: NickSyncOutcome, verb: string): string {
   if (outcome.changed === 0 && outcome.failed === 0) return '';
