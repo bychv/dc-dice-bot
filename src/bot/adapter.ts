@@ -15,6 +15,7 @@ import {
   type InteractionEditReplyOptions,
   type InteractionReplyOptions,
   type Message,
+  type PartialMessage,
 } from 'discord.js';
 
 import type {
@@ -27,7 +28,12 @@ import type {
 import type { BotStore } from '../contracts/store.ts';
 import { handleButtonClick } from './confirm.ts';
 import { actorEcho } from './handlers/context.ts';
-import { appendBotReplyLine, appendUserLogLine } from './logFormat.ts';
+import {
+  appendBotReplyLine,
+  appendUserLogLine,
+  appendUserLogLineForMessage,
+  replaceUserLogLine,
+} from './logFormat.ts';
 import { botSpeakerName, speakerName } from './logSpeaker.ts';
 import { route } from './router.ts';
 
@@ -497,30 +503,96 @@ export async function handleButtonInteraction(
 export function createLogRecorder(store: BotStore): (message: Message) => void {
   return (message: Message): void => {
     try {
-      if (message.author?.bot) return;
-      const channelId = message.channelId;
-      if (!channelId) return;
-      const parentId = message.channel?.isThread?.() ? (message.channel.parentId ?? null) : null;
-      const userId = message.author?.id ?? '0';
-      const displayName = message.member?.displayName ?? message.author?.username ?? '未知';
-      const name = speakerName(
-        store,
-        { guildId: message.guildId ?? null, channelId, parentChannelId: parentId, userId },
-        displayName,
-      );
-      const text = message.content?.trim() ?? '';
-      const attachments = message.attachments?.size
-        ? [...message.attachments.values()].map((file) => `[附件 ${file.name}]`).join(' ')
-        : '';
-      const line = [text, attachments].filter((part) => part.length > 0).join(' ');
-      if (line.length === 0) return;
-      const input = { name, uid: userId, at: new Date(), text: line };
-      const appended = appendUserLogLine(store, channelId, input);
+      const body = messageBodyOf(message, store);
+      if (!body) return;
+      const appended = appendUserLogLineForMessage(store, body.channelId, message.id, {
+        name: body.name,
+        uid: body.userId,
+        at: new Date(),
+        text: body.text,
+      });
       // 子区消息：子区本身常常不是「绑定场景」（游戏绑的是父频道/主场景），
       // 这时按父频道再投一次，否则"在子区里说话"会完全不入日志。
-      if (appended === 0 && parentId) appendUserLogLine(store, parentId, input);
+      if (appended === 0 && body.parentId) {
+        appendUserLogLineForMessage(store, body.parentId, message.id, {
+          name: body.name,
+          uid: body.userId,
+          at: new Date(),
+          text: body.text,
+        });
+      }
     } catch {
       // logging must never take the client down
     }
+  };
+}
+
+interface MessageBody {
+  channelId: string;
+  parentId: string | null;
+  userId: string;
+  name: string;
+  /** 正文 + `[附件 x]`，已 trim */
+  text: string;
+}
+
+/** 把一条 Discord 消息折成日志正文（recorder 与 editor 共用，保证两边口径完全一致）。 */
+function messageBodyOf(message: Message | PartialMessage, store: BotStore): MessageBody | null {
+  if (message.author?.bot) return null;
+  const channelId = message.channelId;
+  if (!channelId) return null;
+  const parentId = message.channel?.isThread?.() ? (message.channel.parentId ?? null) : null;
+  const userId = message.author?.id ?? '0';
+  const displayName = message.member?.displayName ?? message.author?.username ?? '未知';
+  const name = speakerName(
+    store,
+    { guildId: message.guildId ?? null, channelId, parentChannelId: parentId, userId },
+    displayName,
+  );
+  const text = message.content?.trim() ?? '';
+  const attachments = message.partial ? "" : message.attachments?.size
+    ? [...message.attachments.values()].map((file) => `[附件 ${file.name}]`).join(' ')
+    : '';
+  const line = [text, attachments].filter((part) => part.length > 0).join(' ');
+  if (line.length === 0) return null;
+  return { channelId, parentId, userId, name, text: line };
+}
+
+/**
+ * 编辑跟随（docs §11.1）：玩家改了消息，日志里那一行**原地**跟着改成新正文
+ * （时间戳、名字、uid、行序都不动，因为编辑不改变"他什么时候说的"）。
+ *
+ * 注意两点：
+ * - `MessageUpdate` 也会因**链接预览 / embed 展开**触发，那时正文没变 → 用"新旧正文相同就返回"去重；
+ * - 事件可能是 **partial**（缓存里没有完整对象）→ 先 `fetch()` 拿正文，拿不到就安静放弃。
+ */
+export function createLogEditor(
+  store: BotStore,
+): (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage) => void {
+  return (oldMessage, newMessage): void => {
+    void (async () => {
+      try {
+        if (newMessage.author?.bot || oldMessage.author?.bot) return;
+        let fresh: Message | PartialMessage = newMessage;
+        if (fresh.partial || fresh.content === null || fresh.content === undefined) {
+          try {
+            fresh = await fresh.fetch();
+          } catch {
+            return;
+          }
+        }
+        // 预览/embed/附件变化时正文不变：不是真正的编辑
+        if (oldMessage.content === fresh.content) return;
+        const body = messageBodyOf(fresh, store);
+        // 正文被清空（例如纯附件消息删掉附件）时保留原行，避免写出空正文的畸形行
+        if (!body) return;
+        const updated = replaceUserLogLine(store, body.channelId, newMessage.id, body.text);
+        if (updated === 0 && body.parentId) {
+          replaceUserLogLine(store, body.parentId, newMessage.id, body.text);
+        }
+      } catch {
+        // 编辑跟随失败绝不能把客户端带崩
+      }
+    })();
   };
 }

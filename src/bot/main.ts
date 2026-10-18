@@ -17,6 +17,7 @@ import { createDiceEngine, createMathRng } from '../dice/index.ts';
 import { createJsonStoreWithExtras } from '../store/jsonStore.ts';
 import {
   createDiscordPlatform,
+  createLogEditor,
   createLogRecorder,
   handleButtonInteraction,
   handleInteraction,
@@ -191,6 +192,8 @@ client.on(Events.InteractionCreate, (interaction) => {
 });
 
 client.on(Events.MessageCreate, createLogRecorder(store));
+// 编辑跟随：玩家改了消息，日志里那一行原地跟着改（docs §11.1）
+client.on(Events.MessageUpdate, createLogEditor(store));
 
 client.on(Events.Error, (error) => {
   console.error('discord.js 客户端错误：', error);

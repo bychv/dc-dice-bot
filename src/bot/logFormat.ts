@@ -26,6 +26,15 @@ export interface DiceLogAppendSink {
   appendLogLine(channelId: string, line: string): number;
 }
 
+/**
+ * 编辑跟随用：带消息 id 的追加 / 按消息 id 改写正文。
+ * 行里**不放消息 id**（Dice! 行格式是逐字节约定），索引另存在 store 里。
+ */
+export interface DiceLogEditSink extends DiceLogAppendSink {
+  appendLogLineForMessage(channelId: string, messageId: string, line: string): number;
+  replaceLogLineForMessage(channelId: string, messageId: string, text: string): number;
+}
+
 export interface DiceLogLineInput {
   /** 玩家在该局的称呼（Dice! `idx_pc().to_str()`）；骰娘回执时为骰娘名 */
   name: string;
@@ -72,6 +81,36 @@ export function appendUserLogLine(
   input: DiceLogLineInput,
 ): number {
   return store.appendLogLine(channelId, formatDiceLogLine(input));
+}
+
+/**
+ * 同 `appendUserLogLine`，但同时记下"消息 id → 行号"；
+ * store 不具备编辑跟随能力时自动退化成普通追加（消息仍然入日志，只是事后改不了）。
+ */
+export function appendUserLogLineForMessage(
+  store: DiceLogAppendSink,
+  channelId: string,
+  messageId: string,
+  input: DiceLogLineInput,
+): number {
+  const line = formatDiceLogLine(input);
+  const editable = store as Partial<DiceLogEditSink>;
+  if (typeof editable.appendLogLineForMessage === 'function') {
+    return editable.appendLogLineForMessage(channelId, messageId, line);
+  }
+  return store.appendLogLine(channelId, line);
+}
+
+/** 按消息 id 把已记录的那一行**只替换正文**（保留 `名字(uid) 时间` 头与行序）；返回更新的日志条数。 */
+export function replaceUserLogLine(
+  store: DiceLogAppendSink,
+  channelId: string,
+  messageId: string,
+  text: string,
+): number {
+  const editable = store as Partial<DiceLogEditSink>;
+  if (typeof editable.replaceLogLineForMessage !== 'function') return 0;
+  return editable.replaceLogLineForMessage(channelId, messageId, text);
 }
 
 /** 把骰娘回执按 Dice! 格式追加到频道当前 `on` 日志（`respond` 集成时调用）。 */

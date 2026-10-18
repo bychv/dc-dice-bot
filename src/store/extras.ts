@@ -72,3 +72,25 @@ export interface LogLineReader {
 export function isLogLineReader(store: object): store is LogLineReader {
   return typeof (store as Partial<LogLineReader>).logLines === 'function';
 }
+
+/**
+ * **编辑跟随**（docs §11.1）：玩家改了消息，日志里那一行要跟着改。
+ *
+ * 行格式是 Dice! 逐字节约定（`<名字>(<uid>) <时间>\n<正文>\n\n`），**不能把消息 id 塞进行里**，
+ * 所以实现上另存一张"日志 → 消息 id → 行号"的索引，编辑时按索引**原地替换正文**：
+ * 时间戳、名字、uid 与行序都不动（见 Agent Note「编辑消息同步改写日志行」）。
+ */
+export interface LogLineIndexStore {
+  /** 追加一条**带消息 id** 的日志行，并记下它在每条命中日志里的行号；返回写入的日志条数。 */
+  appendLogLineForMessage(channelId: string, messageId: string, line: string): number;
+  /** 按消息 id 找到已记录的行，只替换正文；返回实际更新的行数（0 = 没记录过 / 日志已结束）。 */
+  replaceLogLineForMessage(channelId: string, messageId: string, text: string): number;
+}
+
+export function isLogLineIndexStore(store: object): store is LogLineIndexStore {
+  const candidate = store as Partial<LogLineIndexStore>;
+  return (
+    typeof candidate.appendLogLineForMessage === 'function' &&
+    typeof candidate.replaceLogLineForMessage === 'function'
+  );
+}

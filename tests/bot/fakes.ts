@@ -20,7 +20,7 @@ import type {
   NickSyncState,
 } from '../../src/contracts/model.ts';
 import type { BindingEntry, BotStore } from '../../src/contracts/store.ts';
-import type { NickSyncStore } from '../../src/store/extras.ts';
+import type { LogLineIndexStore, NickSyncStore } from '../../src/store/extras.ts';
 
 /** 沙箱不允许写系统临时目录（EPERM），测试数据一律放在包内 .tmp/. */
 const TMP_ROOT = fileURLToPath(new URL('../.tmp/', import.meta.url));
@@ -49,7 +49,7 @@ import type { LogLineReader, NickStore, RuleSetStore } from '../../src/store/ext
 // store
 // ---------------------------------------------------------------------------
 
-export class MemoryStore implements BotStore, NickStore, RuleSetStore, LogLineReader, NickSyncStore {
+export class MemoryStore implements BotStore, NickStore, RuleSetStore, LogLineReader, NickSyncStore, LogLineIndexStore {
   sheets = new Map<string, Map<string, CharacterSheet>>();
   bindings: Record<BindingScope, Map<string, Map<string, string>>> = {
     game: new Map(),
@@ -259,6 +259,45 @@ export class MemoryStore implements BotStore, NickStore, RuleSetStore, LogLineRe
       this.lines.set(log.id, lines);
     }
     return targets.length;
+  }
+
+  // ---- 编辑跟随（docs §11.1），与 jsonStore 同一套口径 -------------------
+
+  msgIndex = new Map<string, Map<string, number>>();
+
+  appendLogLineForMessage(channelId: string, messageId: string, line: string): number {
+    const targets = [...this.logs.values()].filter(
+      (log) =>
+        log.state === 'on' && (log.channelId === channelId || log.sceneIds.includes(channelId)),
+    );
+    for (const log of targets) {
+      const lines = this.lines.get(log.id) ?? [];
+      lines.push(line);
+      this.lines.set(log.id, lines);
+      const byMessage = this.msgIndex.get(log.id) ?? new Map<string, number>();
+      byMessage.set(messageId, lines.length - 1);
+      this.msgIndex.set(log.id, byMessage);
+    }
+    return targets.length;
+  }
+
+  replaceLogLineForMessage(channelId: string, messageId: string, text: string): number {
+    let updated = 0;
+    for (const [logId, byMessage] of this.msgIndex) {
+      const lineIndex = byMessage.get(messageId);
+      if (lineIndex === undefined) continue;
+      const log = this.logs.get(logId);
+      if (!log || log.state === 'ended') continue;
+      if (log.channelId !== channelId && !log.sceneIds.includes(channelId)) continue;
+      const lines = this.lines.get(logId);
+      const current = lines?.[lineIndex];
+      if (current === undefined) continue;
+      const headerEnd = current.indexOf('\n');
+      if (headerEnd <= 0) continue;
+      lines![lineIndex] = `${current.slice(0, headerEnd)}\n${text}\n\n`;
+      updated += 1;
+    }
+    return updated;
   }
 
   /**

@@ -25,7 +25,13 @@ import type {
 import type { BindingEntry, BotStore, StoreOptions } from '../contracts/store.ts';
 // pure formatter (no Discord dependency): the export file name follows Dice! `DiceSession::log_new`
 import { diceLogFileName, diceLogSessionName } from '../bot/logFormat.ts';
-import type { LogLineReader, NickStore, NickSyncStore, RuleSetStore } from './extras.ts';
+import type {
+  LogLineIndexStore,
+  LogLineReader,
+  NickStore,
+  NickSyncStore,
+  RuleSetStore,
+} from './extras.ts';
 
 type SheetsDb = Record<string, Record<string, CharacterSheet>>;
 type BindingMap = Record<string, Record<string, string>>;
@@ -41,7 +47,16 @@ type SceneRow = { guildId: string; gameId: string };
 type ScenesDb = Record<string, SceneRow>;
 type RulesDb = { game: Record<string, HouseRule>; scene: Record<string, HouseRule> };
 type ThreadsDb = Record<string, string>;
-type LogsDb = { logs: Record<string, LogRecord>; lines: Record<string, string[]>; nextId: number };
+type LogsDb = {
+  logs: Record<string, LogRecord>;
+  lines: Record<string, string[]>;
+  /**
+   * 编辑跟随用的索引（docs §11.1）：`logId → messageId → 行号`。
+   * 与 `lines` 同在 `logs.json` 里，随同一次 `markDirty('logs')` 原子落盘。
+   */
+  msgIndex?: Record<string, Record<string, number>>;
+  nextId: number;
+};
 type MiscDb = {
   nicks: Record<string, string>;
   ruleSets: Record<string, string>;
@@ -99,7 +114,7 @@ function ruleKey(gameId: string, guildId?: string): string {
   return guildId === undefined ? gameId : `${guildId}|${gameId}`;
 }
 
-class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader, NickSyncStore {
+class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader, NickSyncStore, LogLineIndexStore {
   readonly dir: string;
 
   private sheets: SheetsDb;
@@ -141,6 +156,7 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader, Nic
     if (!this.rules.game) this.rules = { game: {}, scene: {} };
     if (!this.logs.logs) this.logs = { logs: {}, lines: {}, nextId: 0 };
     if (!this.logs.lines) this.logs.lines = {};
+    if (!this.logs.msgIndex) this.logs.msgIndex = {};
     if (!this.misc.nicks) this.misc = { nicks: {}, ruleSets: {}, nickSync: {} };
     // 老版本没有 nickSync（`/sn` 统计昵称同步），补一张空表
     if (!this.misc.ruleSets) this.misc.ruleSets = {};
@@ -482,6 +498,52 @@ class JsonStore implements BotStore, NickStore, RuleSetStore, LogLineReader, Nic
     return targets.length;
   }
 
+  // ---- 编辑跟随（docs §11.1）：消息 id → 行号 的索引 ---------------------
+
+  appendLogLineForMessage(channelId: string, messageId: string, line: string): number {
+    const targets = Object.values(this.logs.logs).filter(
+      (log) =>
+        log.state === 'on' && (log.channelId === channelId || log.sceneIds.includes(channelId)),
+    );
+    if (targets.length === 0) return 0;
+    const index = this.logs.msgIndex ?? (this.logs.msgIndex = {});
+    for (const log of targets) {
+      const lines = this.logs.lines[log.id] ?? (this.logs.lines[log.id] = []);
+      lines.push(line);
+      (index[log.id] ?? (index[log.id] = {}))[messageId] = lines.length - 1;
+    }
+    this.markDirty('logs');
+    return targets.length;
+  }
+
+  replaceLogLineForMessage(channelId: string, messageId: string, text: string): number {
+    const index = this.logs.msgIndex;
+    if (!index) return 0;
+    let updated = 0;
+    for (const [logId, byMessage] of Object.entries(index)) {
+      const lineIndex = byMessage[messageId];
+      if (lineIndex === undefined) continue;
+      const log = this.logs.logs[logId];
+      if (!log) continue;
+      // 已结束的日志是已导出的存档：事后改写会让"再导出"与当初发出去的文件不一致
+      if (log.state === 'ended') continue;
+      // 同一个场景才允许改（索引按日志记，防止跨场景错改）
+      if (log.channelId !== channelId && !log.sceneIds.includes(channelId)) continue;
+      const lines = this.logs.lines[logId];
+      const current = lines?.[lineIndex];
+      if (current === undefined) continue;
+      // 行形态：`<名字>(<uid>) <时间>\n<正文>\n\n`。头不匹配说明索引已漂移（有人手改了数据文件），跳过而不是盲写
+      const headerEnd = current.indexOf('\n');
+      if (headerEnd <= 0 || !/\(\d+\) \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(current.slice(0, headerEnd))) {
+        continue;
+      }
+      lines![lineIndex] = `${current.slice(0, headerEnd)}\n${text}\n\n`;
+      updated += 1;
+    }
+    if (updated > 0) this.markDirty('logs');
+    return updated;
+  }
+
   logFilePath(log: LogRecord): string {
     const dir = join(this.dir, 'logs');
     mkdirSync(dir, { recursive: true });
@@ -634,6 +696,6 @@ export function createJsonStore(options: StoreOptions): BotStore {
 /** Same as `createJsonStore`, but with the bot-layer extras (`/nn`, `/rules set`) visible. */
 export function createJsonStoreWithExtras(
   options: StoreOptions,
-): BotStore & NickStore & RuleSetStore & LogLineReader {
+): BotStore & NickStore & RuleSetStore & LogLineReader & NickSyncStore & LogLineIndexStore {
   return new JsonStore(options);
 }
