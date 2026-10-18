@@ -52,6 +52,8 @@ export interface PercentileSuccess {
   units: number;
   /** all candidate values, the first is the chosen one */
   candidates: number[];
+  /** 各颗额外十位骰的点数（掷骰顺序），与普通 `/r` 的 `[奖励骰:6 5]` 同源 */
+  tensValues: number[];
   bonus: number;
   penalty: number;
 }

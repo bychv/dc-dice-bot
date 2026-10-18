@@ -544,7 +544,7 @@ export class StubDice implements DiceEngine {
 
   percentile(_opts: { bonus?: number; penalty?: number }, rng: Rng): PercentileResult {
     const value = rng.int(1, 100);
-    return { ok: true, value, tens: Math.floor(value / 10), units: value % 10, candidates: [value], bonus: 0, penalty: 0 };
+    return { ok: true, value, tens: Math.floor(value / 10), units: value % 10, candidates: [value], tensValues: [], bonus: 0, penalty: 0 };
   }
 }
 

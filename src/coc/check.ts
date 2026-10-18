@@ -201,7 +201,12 @@ export function runCheck(dice: DiceEngine, text: string, opts: CheckOptions): Ch
     if (!rolled.ok) return { ok: false, error: rolled.error };
     let level = successLevel(rolled.value, target, opts.rule);
     if (parsed.difficulty === 'auto' && level === '失败') level = '成功';
-    details.push({ roll: rolled.value, target, level });
+    // 奖惩骰明细：与普通 `/r` 同一写法 `[奖励骰:6 5]`（括号里是各颗十位骰点数）
+    const diceDetail =
+      rolled.tensValues.length > 0
+        ? `[${rolled.bonus > 0 ? '奖励骰' : '惩罚骰'}:${rolled.tensValues.join(' ')}]`
+        : undefined;
+    details.push({ roll: rolled.value, target, level, ...(diceDetail ? { diceDetail } : {}) });
   }
 
   const tags: string[] = [];
@@ -217,10 +222,15 @@ export function runCheck(dice: DiceEngine, text: string, opts: CheckOptions): Ch
   const first = details[0];
   const lines =
     parsed.rounds === 1
-      ? [`${parsed.skillName} 检定 D100=${first.roll}/${target} → ${first.level}（${tags.join('，')}）${reasonText}`]
+      ? [
+          `${parsed.skillName} 检定 D100=${first.roll}${first.diceDetail ?? ''}/${target} → ${first.level}（${tags.join('，')}）${reasonText}`,
+        ]
       : [
           `${parsed.skillName} 检定 ×${parsed.rounds}（${tags.join('，')}）${reasonText}`,
-          ...details.map((detail, index) => `${index + 1}. D100=${detail.roll}/${target} → ${detail.level}`),
+          ...details.map(
+            (detail, index) =>
+              `${index + 1}. D100=${detail.roll}${detail.diceDetail ?? ''}/${target} → ${detail.level}`,
+          ),
         ];
 
   return {

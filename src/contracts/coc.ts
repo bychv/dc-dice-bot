@@ -29,6 +29,11 @@ export interface CheckRound {
   roll: number;
   target: number;
   level: SuccessLevel;
+  /**
+   * 奖惩骰的**明细后缀**，与普通 `/r` 同一套写法：`[奖励骰:6 5]` / `[惩罚骰:3]`
+   * （括号里是各颗十位骰的点数）。没有奖惩骰时不设。
+   */
+  diceDetail?: string;
 }
 
 /** `/rc`, `/ra` result (multi-round aware). */

@@ -169,7 +169,7 @@ function rollPercentile(
   const effectiveBonus = net > 0 ? net : 0;
   const effectivePenalty = net < 0 ? -net : 0;
 
-  const { candidates } = rollPercentileDice(extra, rng);
+  const { candidates, tensValues } = rollPercentileDice(extra, rng);
   let chosenIndex = 0;
   for (let i = 1; i < candidates.length; i++) {
     const candidate = candidates[i] as number;
@@ -184,6 +184,7 @@ function rollPercentile(
     tens: Math.floor(value / 10),
     units: value % 10,
     candidates: [value, ...candidates.filter((_, index) => index !== chosenIndex)],
+    tensValues,
     bonus: effectiveBonus,
     penalty: effectivePenalty,
   };

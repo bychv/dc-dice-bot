@@ -179,6 +179,38 @@ describe('T4 · /rc 文本解析（§7.1）', () => {
     assert.equal(result.details[0].level, '困难成功', '50/2 = 25');
   });
 
+  test('奖惩骰明细与普通 /r 同写法：`[奖励骰:8 2]`（连发每轮各带自己的）', () => {
+    const single = runCheck(dice, 'b2 力量 50', { sheet: null, rule: 0, rng: sequenceRng([50, 8, 2]) });
+    assert.ok(single.ok);
+    assert.equal(single.details[0].diceDetail, '[奖励骰:8 2]', '括号里是各颗十位骰点数');
+    assert.match(single.lines[0]!, /D100=20\[奖励骰:8 2\]\/50 → 困难成功/);
+
+    const penalty = runCheck(dice, 'p1 力量 50', { sheet: null, rule: 0, rng: sequenceRng([30, 7]) });
+    assert.ok(penalty.ok);
+    assert.equal(penalty.details[0].diceDetail, '[惩罚骰:7]');
+    assert.match(penalty.lines[0]!, /D100=\d+\[惩罚骰:7\]\/50/);
+
+    // 连发：每轮各自一行、各自带奖惩骰明细
+    const multi = runCheck(dice, '3#b1 力量 50', {
+      sheet: null,
+      rule: 0,
+      rng: sequenceRng([50, 8, 62, 2, 31, 5]),
+    });
+    assert.ok(multi.ok);
+    assert.equal(multi.details.length, 3);
+    for (const detail of multi.details) assert.match(detail.diceDetail ?? '', /^\[奖励骰:\d\]$/);
+    assert.equal(multi.lines.length, 4, '标题 + 3 轮');
+    for (let i = 1; i < multi.lines.length; i++) {
+      assert.match(multi.lines[i]!, new RegExp(`^${i}\\. D100=\\d+\\[奖励骰:\\d\\]/50 → `));
+    }
+
+    // 没有奖惩骰时不带后缀（保持原格式）
+    const plain = runCheck(dice, '力量 50', { sheet: null, rule: 0, rng: sequenceRng([45]) });
+    assert.ok(plain.ok);
+    assert.equal(plain.details[0].diceDetail, undefined);
+    assert.match(plain.lines[0]!, /D100=45\/50/);
+  });
+
   test('parseCheck 与 runCheck 的 target 语义差异（字符化断言，非规格违背）', () => {
     const parsed = parseCheck('困难智力 99');
     assert.ok('skillName' in parsed);

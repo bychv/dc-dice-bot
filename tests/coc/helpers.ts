@@ -89,6 +89,7 @@ export function stubDice(): DiceEngine {
         tens: Math.floor(value / 10) % 10,
         units: value % 10,
         candidates: [value],
+        tensValues: [],
         bonus: opts.bonus ?? 0,
         penalty: opts.penalty ?? 0,
       };
