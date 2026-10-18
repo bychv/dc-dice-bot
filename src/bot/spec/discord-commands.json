@@ -735,6 +735,40 @@
     ]
   },
   {
+    "name": "stx",
+    "description": "View another member sheet (read-only, private reply)",
+    "description_localizations": {
+      "zh-CN": "查看他人角色卡属性（只读，仅自己可见；省略成员则看自己）"
+    },
+    "options": [
+      {
+        "type": 6,
+        "name": "user",
+        "description": "Member whose sheet to view (omit = yourself)",
+        "name_localizations": {
+          "zh-CN": "被查看者"
+        },
+        "description_localizations": {
+          "zh-CN": "查看谁的角色卡；省略就是自己"
+        },
+        "required": false
+      },
+      {
+        "type": 3,
+        "name": "name",
+        "description": "Specific sheet name (omit = the sheet active in this scene)",
+        "name_localizations": {
+          "zh-CN": "卡名"
+        },
+        "description_localizations": {
+          "zh-CN": "指定某张卡；省略则用该成员在当前场景生效的卡"
+        },
+        "required": false,
+        "autocomplete": true
+      }
+    ]
+  },
+  {
     "name": "rc",
     "description": "Skill check by parsing the original .rc/.ra text",
     "description_localizations": {
